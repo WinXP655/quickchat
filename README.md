@@ -40,8 +40,28 @@ Chat log stored only on server side and do not contain sensitive information. It
 2. User messages with timestamps.
 3. System messages and events.
 4. Where server set port binding.
+5. Who connected (computer name and LAN IP).
 
+## Protocol
+It uses a very simple yet working custom protocol QuickChat/QuickChat Secure (QC/QCS):
+1. Who starts first: Client. Server never sends anything until it will be QC handshake.
+2. Client sent handshake in following format: QC:PCNAME\0.
+   Replace PCNAME with your computer name or what you want remote side to see.
+   "\0" is required - official backend written on C, meaning you have to follow C rules.
+   If you are using QCS, you need to XOR everything before.
+   First 3 bytes should be exactly "QC:" or XORed version of it. Server reject if it is non-QC or at least 1 byte is wrong.
+3. Server send its name in same format.
+4. Chat starts.
+
+It also supports custom ping:
+1. Send "QCPING" or its XORed version to remote side.
+2. If you receive "QCPONG" or its XORed version, then remote side is active
+3. Note that both sides should know both commands.
 *Server side can delete logs at any time, it is stored only locally*.
 
 ## Changelog
 Read CHANGELOG.md.
+
+---
+
+Enjoy! If you have questions, write me to my Discord - @pcsettings
