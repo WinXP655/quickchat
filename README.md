@@ -44,3 +44,4 @@ Chat log stored only on server side and do not contain sensitive information. It
 *Server side can delete logs at any time, it is stored only locally*.
 
 ## Changelog
+Read CHANGELOG.md.
