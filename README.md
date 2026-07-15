@@ -47,11 +47,14 @@ It uses a very simple yet working custom protocol QuickChat/QuickChat Secure (QC
 1. Who starts first: Client. Server never sends anything until it will be QC handshake.
 2. Client sent handshake in following format: QC:PCNAME\0.
    Replace PCNAME with your computer name or what you want remote side to see.
+   
    "\0" is required - official backend written on C, meaning you have to follow C rules.
+   
    If you are using QCS, you need to XOR everything before.
+   
    First 3 bytes should be exactly "QC:" or XORed version of it. Server reject if it is non-QC or at least 1 byte is wrong.
-3. Server send its name in same format.
-4. Chat starts.
+4. Server send its name in same format.
+5. Chat starts.
 
 It also supports custom ping:
 1. Send "QCPING" or its XORed version to remote side.
