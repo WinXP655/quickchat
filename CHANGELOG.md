@@ -1,6 +1,12 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 12 July 2026)**:
+**QuickChat (Current, 16 July 2026)**:
+- QuickChat became open-source.
+- XOR is generated seprately.
+- Better build system.
+- Added 7z.exe to build package.
+
+**QuickChat (12 July 2026)**:
 
 **Version Note**: Windows 9x (98, ME) support is discontinued since this version. If you want to continue using QuickChat, please upgrade your Windows version.
 
