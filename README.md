@@ -65,6 +65,33 @@ It also supports custom ping:
 ## Changelog
 Read CHANGELOG.md.
 
+## Building from source
+
+### Requirements
+- **MinGW-w64**
+- **Windows** (7/10/11 recommended for build tools)
+
+### Included tools
+- 7z.exe - packaging.
+- keygen.py - XOR key generator.
+- build.bat - build script.
+- resource.rc - resources.
+- quickchat.manifest - Common Controls v6 manifest. Mostly for visual styles.
+
+### Steps
+1. Clone or download a repository
+2. Make sure `gcc`, `windres`, and `python` are available in PATH.
+3. Open a command prompt in the project folder.
+4. Run depending on what you need:
+   `build.bat` - Compile QuickChat without changing key and packing.
+   `build.bat /rekey` - Compile QuickChat and regenrate key without packing.
+   `build.bat /pack` - Compile QuickChat and pack without regenerating key.
+   `build.bat /rekey /pack` - Compile QuickChat, regenerate key and pack.
+
+## Credits
+This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
+`7z.exe` is included for convenience and is used under the terms of the GNU LGPL license.
+
 ---
 
 Enjoy! If you have questions, write me to my Discord - @pcsettings
