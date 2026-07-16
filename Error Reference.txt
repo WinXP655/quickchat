@@ -1,0 +1,10 @@
+10060|Connection timed out (Server unreachable).
+10061|Connection refused (Server not running or blocked by firewall).
+10054|Connection reset by peer.
+10053|Connection aborted.
+10065|Host unreachable.
+10051|Network unreachable.
+10048|Port already in use.
+10057|Socket is not connected.
+10058|Cannot send after socket shutdown.
+10035|Connection busy (Try again later).
