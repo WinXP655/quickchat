@@ -14,6 +14,34 @@
 #include "key.h"
 
 // ======= 2. Defines =======
+// --- UI Controls ---
+#define ID_EDIT 101
+#define ID_SEND 102
+#define ID_MSG_DISPLAY 103
+
+// --- Dialog ---
+#define IDC_IP 1001
+
+// --- Menu: Connection ---
+#define IDM_CLOSE 2001
+#define IDM_LEAVE 2002
+
+// --- Menu: View ---
+#define IDM_ALWAYS_ON_TOP 2101
+#define IDM_CLEAR_CHAT 2102
+
+// --- Menu: Options ---
+#define ID_FLASH_TOGGLE 2201
+#define ID_SOUND_TOGGLE 2202
+
+// --- Menu: Help ---
+#define IDM_ABOUT 2301
+
+// --- Menu: Other ---
+#define IDM_COMPUTER_INFO 2401
+#define IDM_PING_REMOTE 2402
+
+// --- Static ---
 #define SOUND_JOIN   0
 #define SOUND_LEAVE  1
 #define SOUND_MSG    2
@@ -21,19 +49,6 @@
 #define PORT_QCS 65501
 #define PORT_QC  65502
 #define QC_LABEL "QC:"
-#define IDC_IP 1001
-#define ID_MSG_DISPLAY 105
-#define ID_EDIT 101
-#define ID_SEND 102
-#define IDM_EXIT 2001
-#define IDM_ABOUT 2003
-#define ID_FLASH_TOGGLE 40018
-#define ID_SOUND_TOGGLE 40019
-#define IDM_COMPUTER_INFO 2005
-#define IDM_CLEAR_CHAT 2006
-#define IDM_ALWAYS_ON_TOP 2007
-#define IDM_PING_REMOTE 2008
-#define IDM_CLOSE 2004
 
 // ======= 3. Global variables =======
 // ----- Control flags -----
@@ -104,9 +119,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	GetLocalComputerName();
 
 	int mode = MessageBoxW(NULL,
-		L"Run as server?\n"
-		L"Yes - Server\n"
-		L"No - Client (enter server IP)\n"
+		L"Welcome to QuickChat!\n\n"
+		L"What do you want to do?\n"
+		L"Yes - Host (wait for connections)\n"
+		L"No - Join (connect to existing chat)\n"
 		L"Cancel - Exit",
 		L"QuickChat", MB_YESNOCANCEL | MB_ICONQUESTION);
 
@@ -220,8 +236,8 @@ void LogMessage(const wchar_t* message) {
 	SYSTEMTIME st;
 	GetLocalTime(&st);
 
-	wchar_t timestamp[32];
-	swprintf(timestamp, 32,
+	wchar_t timestamp[64];
+	swprintf(timestamp, sizeof(timestamp) / sizeof(wchar_t),
 		L"%04d-%02d-%02d %02d:%02d:%02d.%03d",
 		st.wYear, st.wMonth, st.wDay,
 		st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
@@ -265,7 +281,7 @@ bool GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 	struct sockaddr_in local;
 	int len = sizeof(local);
 	if (getsockname(s, (struct sockaddr*)&local, &len) != 0) {
-		MessageBoxW(NULL, L"Failed to get server IP address.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		MessageBoxW(NULL, L"Failed to get host IP address.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		closesocket(s);
 		WSACleanup();
 		return false;
@@ -285,9 +301,9 @@ void AddMessage(const wchar_t* msg) {
 	// Safe display: checks window handle, buffer size, SendMessage result.
 	if (!hMsgDisplay || !IsWindow(hMsgDisplay) || !msg || !*msg) return;
 	if (wcslen(msg) > BUFFER_SIZE) {
-		wchar_t longmsg[255] = L"[ERROR]: Message is too long to be displayed.";
-		AddMessage(longmsg);
-		if (isServer) LogMessage(longmsg);
+		wchar_t longmsg_err[511] = L"[ERROR]: Message is too long to be displayed.";
+		AddMessage(longmsg_err);
+		if (isServer) LogMessage(longmsg_err);
 		return;
 	}
 	int len = GetWindowTextLengthW(hMsgDisplay);
@@ -297,9 +313,9 @@ void AddMessage(const wchar_t* msg) {
 
 	if (!SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)msg)) {
 		if (isServer) {
-			wchar_t error_msg[256];
-			swprintf(error_msg, 256, L"[ERROR]: Failed to display message. Error: %lu.", GetLastError());
-			if (isServer) LogMessage(error_msg);
+			wchar_t addmsg_err[512];
+			swprintf(addmsg_err, sizeof(addmsg_err) / sizeof(wchar_t), L"[ERROR]: Failed to display message. Error: %lu.", GetLastError());
+			if (isServer) LogMessage(addmsg_err);
 		}
 		SetFocus(hEdit);
 		return;
@@ -328,7 +344,7 @@ void CleanupAndExit() {
 		time_t now = time(NULL);
 		struct tm *t = localtime(&now);
 		wchar_t timestamp[64];
-		wcsftime(timestamp, 64, L"%H:%M:%S %d/%m/%Y", t);
+		wcsftime(timestamp, sizeof(timestamp) / sizeof(wchar_t), L"%H:%M:%S %d/%m/%Y", t);
 		fwprintf(chatLog, L"=== Session Ended at %ls ===\n\n", timestamp);
 		fclose(chatLog);
 		chatLog = NULL;
@@ -377,7 +393,7 @@ bool IsValidTargetIP(const wchar_t* ip_str) {
 }
 
 void CloseConnection() {
-	// Only server allowed to kick client from chat
+	// Only server/host (call whatever you want) allowed to kick client from chat
 	// This is by design
 	if (!isServer) return;
 
@@ -398,14 +414,14 @@ void CloseConnection() {
 
 	DisableChatControls(TRUE);
 
-	wchar_t closeconn[256] = L"[DISCONNECT]: Server closed the connection.";
+	wchar_t closeconn[512] = L"[DISCONNECT]: Host closed the connection.";
 	AddMessage(closeconn);
 	LogMessage(closeconn);
 }
 
 void Disconnect() {
-	wchar_t leave_msg[256];
-	swprintf(leave_msg, 256, L"[DISCONNECT]: %ls left the chat.", computerName);
+	wchar_t leave_msg[512];
+	swprintf(leave_msg, sizeof(leave_msg) / sizeof(wchar_t), L"[DISCONNECT]: %ls left the chat.", computerName);
 
 	if (clientSocket != INVALID_SOCKET && isRunning) {
 		// Convert wchat_t to UTF-8 before sending
@@ -427,7 +443,7 @@ void Disconnect() {
 
 void ShowError(const wchar_t* msg, DWORD err) {
 	wchar_t buffer[512];
-	swprintf(buffer, 512, L"%ls. Error: %lu", msg, err);
+	swprintf(buffer, sizeof(buffer) / sizeof(wchar_t), L"%ls. Error: %lu", msg, err);
 	MessageBoxW(NULL, buffer, L"QuickChat", MB_OK | MB_ICONERROR);
 }
 
@@ -457,7 +473,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			DWORD err = WSAGetLastError();
 			if (err == WSAEADDRINUSE) {
 				MessageBoxW(NULL,
-					L"Port is already in use.\nAnother QuickChat instance may be running.",
+					L"Port is already in use.\nAnother QuickChat host may be running.",
 					L"QuickChat", MB_OK | MB_ICONWARNING);
 			} else {
 				ShowError(L"Bind failed.", err);
@@ -467,9 +483,9 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			return false;
 		}
 
-		wchar_t bind_msg[256];
-		const wchar_t* mode_str = xorEnabled ? L"QCS (Encrypted)" : L"QC (Plaintext)";
-		swprintf(bind_msg, 256, L"[INFO]: Server started: %ls on port %d.", mode_str, active_port);
+		wchar_t bind_msg[512];
+		const wchar_t* mode_str = xorEnabled ? L"QCS (Obfuscated)" : L"QC (Plaintext)";
+		swprintf(bind_msg, sizeof(bind_msg) / sizeof(wchar_t), L"[INFO]: Host started: %ls on port %d.", mode_str, active_port);
 		LogMessage(bind_msg);
 
 		if (listen(server_fd, 1) == SOCKET_ERROR) {
@@ -529,9 +545,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			strncpy(ip_utf8, inet_ntoa(client_addr.sin_addr), 15);
 			ip_utf8[15] = '\0';
 			MultiByteToWideChar(CP_UTF8, 0, ip_utf8, -1, peerIp, sizeof(peerIp) / sizeof(wchar_t));
-
 			MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, peerName, sizeof(peerName) / sizeof(wchar_t));
-
 			break;
 		}
 
@@ -556,10 +570,10 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			}
 		}
 
-		wchar_t sys_msg[256];
-		swprintf(sys_msg, 256, L"[CONNECT]: %ls connected from %ls.", peerName, peerIp);
-		AddMessage(sys_msg);
-		LogMessage(sys_msg);
+		wchar_t join_msg[512];
+		swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: %ls connected from %ls.", peerName, peerIp);
+		AddMessage(join_msg);
+		LogMessage(join_msg);
 	} else {
 		clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 		if (clientSocket == INVALID_SOCKET) {
@@ -568,7 +582,10 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			return false;
 		}
 
-		struct timeval timeout = { .tv_sec = 5, .tv_usec = 0 };
+		struct timeval timeout = {
+			.tv_sec = 5,
+			.tv_usec = 0
+		};
 		setsockopt(clientSocket, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
 
 		int active_port = xorEnabled ? PORT_QCS : PORT_QC;
@@ -610,7 +627,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 		WSAAddressToStringW((LPSOCKADDR)&server_info, sizeof(server_info), NULL, ip_w, &ip_len);
 		wcscpy(peerIp, ip_w);
 
-		// Send handshake (Unicode → UTF-8)
+		// Send handshake (Unicode -> UTF-8)
 		char hs[256];
 		int pos = snprintf(hs, sizeof(hs), "%s", QC_LABEL);
 		WideCharToMultiByte(CP_UTF8, 0, computerName, -1, hs + pos, sizeof(hs) - pos, NULL, NULL);
@@ -631,7 +648,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 		hs_reply[recv_len] = '\0';
 
 		if (strncmp(hs_reply, QC_LABEL, strlen(QC_LABEL)) != 0) {
-			MessageBoxW(NULL, L"Invalid QuickChat handshake.", L"QuickChat", MB_OK | MB_ICONERROR);
+			MessageBoxW(NULL, L"Remote host sent an invalid handshake,", L"QuickChat", MB_OK | MB_ICONERROR);
 			closesocket(clientSocket);
 			WSACleanup();
 			return false;
@@ -652,9 +669,9 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			}
 		}
 
-		wchar_t sys_msg[256];
-		swprintf(sys_msg, 256, L"[CONNECT]: Connected to %ls at %ls.", peerName, serverIp);
-		AddMessage(sys_msg);
+		wchar_t join_msg[512];
+		swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: Connected to %ls at %ls.", peerName, serverIp);
+		AddMessage(join_msg);
 	}
 
 	unsigned int threadID;
@@ -671,9 +688,6 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 
 void XorObf(unsigned char *data, int len) {
 	if (!xorEnabled) return;
-
-	// In case if you want old system back - static key
-	// unsigned char key [] = { ... };
 
 	unsigned char k[KEY_LEN];
 	memcpy(k, key, KEY_LEN);
@@ -694,22 +708,22 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 			break;
 
 		if (bytes == SOCKET_ERROR) {
-			int err = WSAGetLastError();
-			if (err == WSAETIMEDOUT) continue;
+			int err_code = WSAGetLastError();
+			if (err_code == WSAETIMEDOUT) continue;
 
-			wchar_t msg[256];
-			swprintf(msg, 256, L"[ERROR]: Connection with remote computer lost. (WSA error: %d)", err);
-			AddMessage(msg);
-			if (isServer) LogMessage(msg);
+			wchar_t connlost_err[512];
+			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. (Error: %d)", connlost_err);
+			AddMessage(connlost_err);
+			if (isServer) LogMessage(connlost_err);
 
 			isRunning = 0;
 			break;
 		}
 
 		if (bytes == 0) {
-			wchar_t msg[256] = L"[DISCONNECT]: Remote computer has closed the connection.";
-			AddMessage(msg);
-			if (isServer) LogMessage(msg);
+			wchar_t close_msg[512] = L"[DISCONNECT]: Remote computer has closed the connection.";
+			AddMessage(close_msg);
+			if (isServer) LogMessage(close_msg);
 			DisableChatControls(TRUE);
 			isRunning = 0;
 			break;
@@ -728,9 +742,9 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 		}
 
 		if (strcmp(buffer, "QCPONG") == 0) {
-			wchar_t pingmsg[256] = L"[INFO]: Client responded to PING packet.";
-			LogMessage(pingmsg);
-			AddMessage(pingmsg);
+			wchar_t ping_msg[512] = L"[INFO]: Client responded to PING packet.";
+			LogMessage(ping_msg);
+			AddMessage(ping_msg);
 			continue;
 		}
 
@@ -758,11 +772,11 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 void SendCurrentMessage(HWND hWnd) {
 	// Counting characters including formatting.
 	int msglen = GetWindowTextLengthW(hEdit);
-	int maxallowed = (BUFFER_SIZE - 1) - wcslen(computerName) - 4;
+	int maxallowed = (BUFFER_SIZE - 1) - wcslen(computerName) - 8;
 	if (msglen > maxallowed) {
-		wchar_t longsend[255] = L"[ERROR]: Message is too long to be sent.";
-		AddMessage(longsend);
-		if (isServer) LogMessage(longsend);
+		wchar_t toolong_err[512] = L"[ERROR]: Message is too long to be sent.";
+		AddMessage(toolong_err);
+		if (isServer) LogMessage(toolong_err);
 		return;
 	}
 	
@@ -807,7 +821,7 @@ void SendCurrentMessage(HWND hWnd) {
 
 			switch(error_code) {
 				case WSAECONNRESET:
-					error_desc = L"Connection reset by peer (unexpected reset)";
+					error_desc = L"Connection was reset by peer";
 					break;
 				case WSAENOTCONN:
 					error_desc = L"Socket is not connected";
@@ -816,17 +830,17 @@ void SendCurrentMessage(HWND hWnd) {
 					error_desc = L"Connection timed out";
 					break;
 				case WSAECONNABORTED:
-					error_desc = L"Connection aborted";
+					error_desc = L"Connection was aborted";
 					break;
 				default:
-					error_desc = L"Unknown error";
+					error_desc = L"An unknwon error has happened";
 					break;
 			}
 
-			wchar_t error_msg[512];
-			swprintf(error_msg, 512, L"[ERROR]: Failed to send message. Error: %ls (WSA error: %d)", error_desc, error_code);
-			AddMessage(error_msg);
-			if (isServer) LogMessage(error_msg);
+			wchar_t send_err[512];
+			swprintf(send_err, sizeof(send_err) / sizeof(wchar_t), L"[ERROR]: Failed to send message. Error: %ls (WSA error: %d)", error_desc, error_code);
+			AddMessage(send_err);
+			if (isServer) LogMessage(send_err);
 		}
 	}
 
@@ -851,7 +865,7 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 		case WM_COMMAND:
 			if (LOWORD(wParam) == IDOK) {
 				wchar_t ip[16];
-				GetDlgItemTextW(hwnd, IDC_IP, ip, 16);
+				GetDlgItemTextW(hwnd, IDC_IP, ip, sizeof(ip) / sizeof(wchar_t));
 
 				wchar_t *p = ip;
 				while (*p == L' ') p++;
@@ -862,7 +876,7 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 				}
 
 				if (wcslen(p) == 0) {
-					MessageBoxW(hwnd, L"Server IP is required for connection.", L"QuickChat", MB_OK | MB_ICONWARNING);
+					MessageBoxW(hwnd, L"Host IP is required for connection.", L"QuickChat", MB_OK | MB_ICONWARNING);
 					SetFocus(GetDlgItem(hwnd, IDC_IP));
 					return TRUE;
 				}
@@ -887,15 +901,15 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 DWORD WINAPI ShowServerIPMessage(LPVOID lpParam) {
 	(void)lpParam;
 
-	wchar_t message[512];
+	wchar_t srv_info[512];
 	const wchar_t* mode = xorEnabled ? L"QCS (QuickChat Obfuscated)" : L"QC (QuickChat, plain text)";
-	swprintf(message, 512,
-		L"Server IP: %ls\n"
+	swprintf(srv_info, sizeof(srv_info) / sizeof(wchar_t),
+		L"Host IP: %ls\n"
 		L"Protocol: %ls\n"
-		L"Share with users to connect to server.",
+		L"Share with users to connect to host.",
 		serverIp, mode);
 
-	MessageBoxW(NULL, message, L"QuickChat", MB_OK | MB_ICONINFORMATION);
+	MessageBoxW(NULL, srv_info, L"QuickChat", MB_OK | MB_ICONINFORMATION);
 	return 0;
 }
 
@@ -908,9 +922,9 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 	wc.hIcon = LoadIconW(hInstance, L"ICON");
 	RegisterClassW(&wc);
 
-	wchar_t title[256];
+	wchar_t title[512];
 	const wchar_t* protocol_label = xorEnabled ? L"QCS" : L"QC";
-	swprintf(title, 256, L"QuickChat (%ls) - %ls", protocol_label, peerName);
+	swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat (%ls) - %ls", protocol_label, peerName);
 
 	HWND hWnd = CreateWindowW(L"QuickChatWndClass", title,
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX,
@@ -990,7 +1004,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 						CloseConnection();
 					}
 				}
-			} else if (LOWORD(wParam) == IDM_EXIT) {
+			} else if (LOWORD(wParam) == IDM_LEAVE) {
 				if (!isRunning) CleanupAndExit();
 
 				if (MessageBoxW(hWnd, L"Leave current chat?", L"QuickChat", MB_ICONQUESTION | MB_YESNO) == IDYES) {
@@ -1021,7 +1035,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 					L"Connected: %ls",
 					display_name, ip, protocol_label, connected);
 
-				MessageBoxW(hWnd, info_msg, L"QuickChat - Remote Computer", MB_OK | MB_ICONINFORMATION);
+				MessageBoxW(hWnd, info_msg, L"QuickChat", MB_OK | MB_ICONINFORMATION);
 			} else if (LOWORD(wParam) == IDM_CLEAR_CHAT) {
 				SetWindowTextW(hMsgDisplay, L"");
 			} else if (LOWORD(wParam) == IDM_ALWAYS_ON_TOP) {
@@ -1036,7 +1050,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				return 0;
 			} else if (LOWORD(wParam) == IDM_PING_REMOTE) {
 				if (!isRunning || clientSocket == INVALID_SOCKET) {
-					AddMessage(L"[ERROR]: Remote computer not connected.");
+					AddMessage(L"[ERROR]: Remote computer is not connected.");
 					return 0;
 				}
 
@@ -1108,7 +1122,7 @@ void CreateMenuBar(HWND hWnd) {
 	AppendMenuW(hConn, MF_STRING, IDM_PING_REMOTE, L"Ping Remote");
 	AppendMenuW(hConn, MF_STRING, IDM_COMPUTER_INFO, L"Computer Info");
 	AppendMenuW(hConn, MF_SEPARATOR, 0, NULL);
-	AppendMenuW(hConn, MF_STRING, IDM_EXIT, L"Leave Chat");
+	AppendMenuW(hConn, MF_STRING, IDM_LEAVE, L"Leave Chat");
 	AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hConn, L"Connection");
 
 	HMENU hView = CreatePopupMenu();

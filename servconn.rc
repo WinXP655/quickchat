@@ -2,10 +2,10 @@
 
 1 DIALOG 0, 0, 180, 75
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "QuickChat - Connect"
+CAPTION "QuickChat"
 FONT 8, "Tahoma"
 {
-    LTEXT "Enter server IP address:", -1, 11, 6, 160, 9
+    LTEXT "Enter host IP address:", -1, 11, 6, 160, 9
     EDITTEXT 1001, 12, 21, 160, 14, ES_AUTOHSCROLL
     LTEXT "Example: 192.168.1.100 or 127.0.0.1", -1, 12, 41, 153, 10
     DEFPUSHBUTTON "Connect", IDOK, 67, 55, 49, 14
