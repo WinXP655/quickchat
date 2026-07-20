@@ -30,8 +30,8 @@ BEGIN
     END
 END
 
-// Иконка
+// Icon
 "ICON" ICON "icon.ico"
 
-// Манифест
+// Manifest
 1 RT_MANIFEST "quickchat.manifest"
