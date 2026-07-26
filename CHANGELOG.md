@@ -1,6 +1,15 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 16 July 2026)**:
+**QuickChat (Current, 26 July 2026)**:
+- Added /clean, /minbuild, /help to build system.
+- Removed unused versioninfo.txt.
+- Added separate connection dialog for minbuild type.
+- Added compile date to About dialog.
+- Added .gitignore.
+
+(mostly build system update, with some small UI update)
+
+**QuickChat (16 July 2026)**:
 - QuickChat became open-source.
 - XOR is generated seprately.
 - Better build system.
