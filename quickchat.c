@@ -946,7 +946,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
 		case WM_CREATE: {
 			hFontBold = CreateFontW(
-				-11, 0, 0, 0, FW_BOLD,
+				13, 0, 0, 0, FW_BOLD,
 				FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
 				DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
@@ -954,7 +954,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			);
 
 			hFontMono = CreateFontW(
-				-12, 0, 0, 0, FW_NORMAL,
+				12, 0, 0, 0, FW_NORMAL,
 				FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
 				DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
@@ -1011,7 +1011,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 					Disconnect();
 				}
 			} else if (LOWORD(wParam) == IDM_ABOUT) {
-				MessageBoxW(hWnd, L"QuickChat\nWinXP655, 2026", L"About QuickChat", MB_OK | MB_ICONINFORMATION);
+				wchar_t aboutmsg[512];
+				swprintf(aboutmsg, sizeof(aboutmsg) / sizeof(wchar_t),
+					L"QuickChat\n"
+					L"Built on %s\n"
+					L"Created by WinXP655\n"
+					L"https://github.com/WinXP655/quickchat",
+					__DATE__);
+				MessageBoxW(hWnd, aboutmsg, L"About QuickChat", MB_OK | MB_ICONINFORMATION);
 			} else if (LOWORD(wParam) == ID_SOUND_TOGGLE) {
 				soundEnabled = !soundEnabled;
 				CheckMenuItem(GetMenu(hWnd), ID_SOUND_TOGGLE, MF_BYCOMMAND | (soundEnabled ? MF_CHECKED : MF_UNCHECKED));
