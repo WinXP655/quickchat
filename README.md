@@ -83,10 +83,12 @@ Read CHANGELOG.md.
 2. Make sure `gcc`, `windres`, and `python` are available in PATH.
 3. Open a command prompt in the project folder.
 4. Run depending on what you need:
-   `build.bat` - Compile QuickChat without changing key and packing.
-   `build.bat /rekey` - Compile QuickChat and regenrate key without packing.
-   `build.bat /pack` - Compile QuickChat and pack without regenerating key.
-   `build.bat /rekey /pack` - Compile QuickChat, regenerate key and pack.
+   `build.bat` - Compile QuickChat without changing key and packing.\
+   `build.bat /rekey` - Compile QuickChat and regenrate key without packing.\
+   `build.bat /pack` - Compile QuickChat and pack without regenerating key.\
+   `build.bat /rekey /pack` - Compile QuickChat, regenerate key and pack.\
+    `build.bat /minbuild` - Compile QuickChat with most minimal configuration.\
+    `build.bat /clean` - Delete existing compiled files.
 
 ## Credits
 This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
