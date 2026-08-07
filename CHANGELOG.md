@@ -1,6 +1,20 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 26 July 2026)**:
+**QuickChat (Current, 7 August 2026)**:
+- Removed playing leave sound on side, which click Leave Chat.\
+  Now leave sound plays only on remote side.
+- Added DPI-aware fonts.
+- More detailed comments.
+- Fix typos.
+- Added IP syntax check.
+- Added moving text cursor to the end of message before sending.
+- "Could not load connection dialog" now triggered when DialogBoxParamW have any negative value (-1, -2 and etc).
+- Make some parts of code more readable.
+- Fixed "Connection lost" showing buffer address instead error code.
+- Replace sounds to sounds with open license. - delayed for third time and still wasn't done, wow
+  (sounds are pain to find)
+
+**QuickChat (26 July 2026)**:
 - Added /clean, /minbuild, /help to build system.
 - Removed unused versioninfo.txt.
 - Added separate connection dialog for minbuild type.
