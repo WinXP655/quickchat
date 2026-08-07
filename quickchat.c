@@ -1,7 +1,8 @@
-// QuickChat LAN Messenger by WinXP655
+// QuickChat LAN Messenger by WinXP655.
 // Minimalistic chat appplication written based on MicroChat.
 // QuickChat Repository: https://github.com/WinXP655/quickchat.
 // MicroChat Framework: https://github.com/WinXP655/microchat.
+// Distributed under MIT License.
 
 // ======= 1. Headers =======
 #include <winsock2.h>
@@ -11,7 +12,7 @@
 #include <time.h>
 #include <commctrl.h>
 #include <process.h>
-#include "key.h"
+#include "key.h" // XOR key here
 
 // ======= 2. Defines =======
 // --- UI Controls ---
@@ -41,13 +42,13 @@
 #define IDM_COMPUTER_INFO 2401
 #define IDM_PING_REMOTE 2402
 
-// --- Static ---
-#define SOUND_JOIN   0
-#define SOUND_LEAVE  1
-#define SOUND_MSG    2
+// --- Non-changable ---
+#define SOUND_JOIN 0
+#define SOUND_LEAVE 1
+#define SOUND_MSG 2
 #define BUFFER_SIZE 8192 // Unicode = 2 bytes
 #define PORT_QCS 65501
-#define PORT_QC  65502
+#define PORT_QC 65502
 #define QC_LABEL "QC:"
 
 // ======= 3. Global variables =======
@@ -136,8 +137,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 			L"No - QC (QuickChat, plain text)\n\n"
 			L"Warning: QC is not recommended as main protocol.",
 			L"QuickChat", MB_YESNO | MB_ICONQUESTION);
-
 		xorEnabled = (proto == IDYES);
+
 		int enable_logs = MessageBoxW(NULL,
 			L"Enable logs for this session?",
 			L"QuickChat", MB_YESNO | MB_ICONQUESTION);
@@ -165,7 +166,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 		while (1) {
 			INT_PTR dlg = DialogBoxParamW(hInstance, MAKEINTRESOURCEW(1), NULL, ConnectDialogProc, 0);
 
-			if (dlg == -1) {
+			// if (dlg == -1) {
+			if (dlg < 0) {
 				MessageBoxW(NULL,
 					L"Could not load connection dialog.",
 					L"QuickChat", MB_OK | MB_ICONERROR);
@@ -220,17 +222,26 @@ void PlayNotifySound(int sound) {
 	const wchar_t* filename = NULL;
 
 	switch (sound) {
-		case SOUND_JOIN:  filename = L"join.wav";	break;
-		case SOUND_LEAVE: filename = L"left.wav";	break;
-		case SOUND_MSG:   filename = L"newmsg.wav";  break;
-		default: return;
+		case SOUND_JOIN:
+			filename = L"join.wav";
+			break;
+
+		case SOUND_LEAVE:
+			filename = L"left.wav";
+			break;
+
+		case SOUND_MSG:
+			filename = L"newmsg.wav";
+			break;
+
+		default:
+			return;
 	}
 
 	PlaySoundW(filename, NULL, SND_FILENAME | SND_ASYNC);
 }
 
 void LogMessage(const wchar_t* message) {
-	// Witing logs in UTF-8 for compatibility
 	if (!loggingEnabled || chatLog == NULL) return;
 
 	SYSTEMTIME st;
@@ -242,6 +253,7 @@ void LogMessage(const wchar_t* message) {
 		st.wYear, st.wMonth, st.wDay,
 		st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 
+	// Writing logs in UTF-8 for compatibility.
 	char timestamp_utf8[64];
 	char msg_utf8[1024];
 	WideCharToMultiByte(CP_UTF8, 0, timestamp, -1, timestamp_utf8, sizeof(timestamp_utf8), NULL, NULL);
@@ -253,9 +265,8 @@ void LogMessage(const wchar_t* message) {
 
 bool GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 	// UDP hack: connect to 8.8.8.8:53 (DNS), then getsockname returns local IP.
-	// Works only when there is a route to the internet.
-	// Fallback: gethostname + gethostbyname is not used because it's deprecated.
-	// Returns 127.0.0.1 if no route.
+	// Works only when there is a route to the internet. Returns 0.0.0.0 if no route.
+
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) return false;
 
@@ -299,6 +310,7 @@ bool GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 
 void AddMessage(const wchar_t* msg) {
 	// Safe display: checks window handle, buffer size, SendMessage result.
+
 	if (!hMsgDisplay || !IsWindow(hMsgDisplay) || !msg || !*msg) return;
 	if (wcslen(msg) > BUFFER_SIZE) {
 		wchar_t longmsg_err[511] = L"[ERROR]: Message is too long to be displayed.";
@@ -333,8 +345,8 @@ void CleanupAndExit() {
 		clientSocket = INVALID_SOCKET;
 	}
 
-	// Never do waiting on thread with recv
-	// It is always bad idea
+	// Never do object wait on thread with recv.
+	// It is always bad idea - adds extra delay.
 	if (hReceiveThread != NULL) {
 		CloseHandle(hReceiveThread);
 		hReceiveThread = NULL;
@@ -381,7 +393,8 @@ bool IsValidTargetIP(const wchar_t* ip_str) {
 	//   x.x.x.0 (network address)
 	//   x.x.x.255 (network broadcast)
 	//   224.0.0.0 - 239.255.255.255 (multicast)
-	//   240.0.0.0 - 255.255.255.255 (reserved + global broadcast)
+	//   240.0.0.0 - 255.255.255.254 (reserved)
+	//   255.255.255.255 (global broadcast)
 	if (o1 == 0) return false;
 	if (o4 == 0) return false;
 	if (o4 == 255) return false;
@@ -393,8 +406,8 @@ bool IsValidTargetIP(const wchar_t* ip_str) {
 }
 
 void CloseConnection() {
-	// Only server/host (call whatever you want) allowed to kick client from chat
-	// This is by design
+	// Only server/host (call whatever you want) allowed to disconnect client from chat.
+	// This is by design.
 	if (!isServer) return;
 
 	if (clientSocket == INVALID_SOCKET) {
@@ -424,7 +437,7 @@ void Disconnect() {
 	swprintf(leave_msg, sizeof(leave_msg) / sizeof(wchar_t), L"[DISCONNECT]: %ls left the chat.", computerName);
 
 	if (clientSocket != INVALID_SOCKET && isRunning) {
-		// Convert wchat_t to UTF-8 before sending
+		// Convert wchat_t to UTF-8 before sending.
 		char utf8_msg[256];
 		WideCharToMultiByte(CP_UTF8, 0, leave_msg, -1, utf8_msg, sizeof(utf8_msg), NULL, NULL);
 		int msg_len = strlen(utf8_msg);
@@ -437,7 +450,6 @@ void Disconnect() {
 
 	AddMessage(leave_msg);
 	if (isServer) LogMessage(leave_msg);
-	PlayNotifySound(SOUND_LEAVE);
 	CleanupAndExit();
 }
 
@@ -551,7 +563,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 
 		closesocket(server_fd);
 
-		// Send handshake reply (with Unicode-to-ANSI conversion)
+		// Send handshake reply (with Unicode-to-ANSI conversion).
 		char hs_reply[256];
 		int pos = snprintf(hs_reply, sizeof(hs_reply), "%s", QC_LABEL);
 		WideCharToMultiByte(CP_UTF8, 0, computerName, -1, hs_reply + pos, sizeof(hs_reply) - pos, NULL, NULL);
@@ -617,8 +629,8 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 		timeout.tv_sec = 0;
 		setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
 
-		// Disabling "Weak Host Model" on pre-Vista versions
-		// On Vista+ systems - switching from "soft bind" to "hard bind"
+		// Disabling "Weak Host Model" on pre-Vista versions (known problem on XP and 2000).
+		// On Vista and newer - switching from "soft bind" to "hard bind".
 		struct sockaddr_in server_info;
 		int len = sizeof(server_info);
 		getsockname(clientSocket, (struct sockaddr*)&server_info, &len);
@@ -627,7 +639,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 		WSAAddressToStringW((LPSOCKADDR)&server_info, sizeof(server_info), NULL, ip_w, &ip_len);
 		wcscpy(peerIp, ip_w);
 
-		// Send handshake (Unicode -> UTF-8)
+		// Send handshake (Unicode -> UTF-8).
 		char hs[256];
 		int pos = snprintf(hs, sizeof(hs), "%s", QC_LABEL);
 		WideCharToMultiByte(CP_UTF8, 0, computerName, -1, hs + pos, sizeof(hs) - pos, NULL, NULL);
@@ -709,10 +721,10 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 
 		if (bytes == SOCKET_ERROR) {
 			int err_code = WSAGetLastError();
-			if (err_code == WSAETIMEDOUT) continue;
+			if (err_code == WSAETIMEDOUT) continue; // Timeout is not an error in this case
 
 			wchar_t connlost_err[512];
-			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. (Error: %d)", connlost_err);
+			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. (Error: %d)", err_code);
 			AddMessage(connlost_err);
 			if (isServer) LogMessage(connlost_err);
 
@@ -758,7 +770,7 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 			PlayNotifySound(SOUND_MSG);
 		}
 
-		// Convert received buffer to Unicode for display
+		// Convert received buffer to Unicode for display.
 		wchar_t wbuffer[BUFFER_SIZE];
 		MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wbuffer, BUFFER_SIZE);
 		AddMessage(wbuffer);
@@ -774,12 +786,12 @@ void SendCurrentMessage(HWND hWnd) {
 	int msglen = GetWindowTextLengthW(hEdit);
 	int maxallowed = (BUFFER_SIZE - 1) - wcslen(computerName) - 8;
 	if (msglen > maxallowed) {
-		wchar_t toolong_err[512] = L"[ERROR]: Message is too long to be sent.";
+		wchar_t toolong_err[512] = L"[ERROR]: Message is too long to send.";
 		AddMessage(toolong_err);
 		if (isServer) LogMessage(toolong_err);
 		return;
 	}
-	
+
 	wchar_t buffer[BUFFER_SIZE];
 	int text_len = GetWindowTextW(hEdit, buffer, BUFFER_SIZE - 1);
 	buffer[text_len] = L'\0';
@@ -803,7 +815,7 @@ void SendCurrentMessage(HWND hWnd) {
 		wchar_t full_msg[BUFFER_SIZE + 128];
 		swprintf(full_msg, BUFFER_SIZE + 128, L"[%ls]: %ls", computerName, start);
 
-		// Convert to UTF-8 for transmission
+		// Convert to UTF-8 for transmission.
 		char utf8_buffer[BUFFER_SIZE + 128];
 		WideCharToMultiByte(CP_UTF8, 0, full_msg, -1, utf8_buffer, sizeof(utf8_buffer), NULL, NULL);
 		int msg_len = strlen(utf8_buffer);
@@ -833,7 +845,7 @@ void SendCurrentMessage(HWND hWnd) {
 					error_desc = L"Connection was aborted";
 					break;
 				default:
-					error_desc = L"An unknwon error has happened";
+					error_desc = L"An unknown error has happened";
 					break;
 			}
 
@@ -867,8 +879,11 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 				wchar_t ip[16];
 				GetDlgItemTextW(hwnd, IDC_IP, ip, sizeof(ip) / sizeof(wchar_t));
 
+				// Trim leading spaces.
 				wchar_t *p = ip;
 				while (*p == L' ') p++;
+
+				// Trim trailing spaces.
 				int len = wcslen(p);
 				while (len > 0 && p[len-1] == L' ') {
 					p[len-1] = L'\0';
@@ -881,12 +896,35 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 					return TRUE;
 				}
 
+				// Validation of IP address syntax.
+				int octets[4];
+				int valid = (swscanf(p, L"%d.%d.%d.%d", &octets[0], &octets[1], &octets[2], &octets[3]) == 4);
+				
+				if (valid) {
+					for (int i = 0; i < 4; i++) {
+						if (octets[i] < 0 || octets[i] > 255) {
+							valid = 0;
+							break;
+						}
+					}
+				}
+
+				if (!valid) {
+					MessageBoxW(hwnd, 
+						L"Invalid IP address.\n"
+						L"Example: 192.168.1.100 or 127.0.0.1.",
+						L"QuickChat", 
+						MB_OK | MB_ICONWARNING);
+					SetFocus(GetDlgItem(hwnd, IDC_IP));
+					return TRUE;
+				}
+
 				if (!IsValidTargetIP(p)) {
 					MessageBoxW(hwnd, L"This IP address is valid, but cannot be used for connection.", L"QuickChat", MB_OK | MB_ICONWARNING);
 					SetFocus(GetDlgItem(hwnd, IDC_IP));
 					return TRUE;
 				}
-
+ 
 				wcscpy(serverIp, p);
 				serverIp[sizeof(serverIp)/sizeof(wchar_t) - 1] = L'\0';
 				EndDialog(hwnd, IDOK);
@@ -923,8 +961,8 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 	RegisterClassW(&wc);
 
 	wchar_t title[512];
-	const wchar_t* protocol_label = xorEnabled ? L"QCS" : L"QC";
-	swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat (%ls) - %ls", protocol_label, peerName);
+	const wchar_t* protocolLabel = xorEnabled ? L"QCS" : L"QC";
+	swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat (%ls) - %ls", protocolLabel, peerName);
 
 	HWND hWnd = CreateWindowW(L"QuickChatWndClass", title,
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX,
@@ -945,8 +983,16 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
 		case WM_CREATE: {
+			// Calculating DPI for UI fonts.
+			// Note that controls are not scalable items.
+			// Scaling controls to display DPI is quite hard.
+			HDC hdc = GetDC(hWnd);
+			int dpi = GetDeviceCaps(hdc, LOGPIXELSY); // 96 DPI
+			int font8pt = -MulDiv(8, dpi, 72); // 8pt
+			int font9pt = -MulDiv(9, dpi, 72); // 9pt
+			
 			hFontBold = CreateFontW(
-				13, 0, 0, 0, FW_BOLD,
+				font8pt, 0, 0, 0, FW_BOLD,
 				FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
 				DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
@@ -954,7 +1000,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			);
 
 			hFontMono = CreateFontW(
-				12, 0, 0, 0, FW_NORMAL,
+				font9pt, 0, 0, 0, FW_NORMAL,
 				FALSE, FALSE, FALSE, DEFAULT_CHARSET,
 				OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
 				DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
@@ -979,6 +1025,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			SendMessageW(hEdit, WM_SETFONT, (WPARAM)hFontMono, TRUE);
 			SendMessageW(hSendBtn, WM_SETFONT, (WPARAM)hFontBold, TRUE);
 
+			// Zero out error code to do not trigger false event.
 			SetLastError(0);
 			oldEditProc = (WNDPROC)SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)EditProc);
 			if (!oldEditProc && GetLastError() != 0) {
@@ -991,6 +1038,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 		case WM_COMMAND: {
 			if (LOWORD(wParam) == ID_SEND) {
+				int textLen = GetWindowTextLengthW(hEdit);
+				SendMessageW(hEdit, EM_SETSEL, textLen, textLen);
 				SendCurrentMessage(hWnd);
 				SetFocus(hEdit);
 			} else if (LOWORD(wParam) == IDM_CLOSE) {
@@ -999,7 +1048,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 						AddMessage(L"[ERROR]: Remote computer is not connected.");
 						return 0L;
 					}
-					
+
 					if (MessageBoxW(hWnd, L"Close current connection?", L"QuickChat", MB_ICONQUESTION | MB_YESNO) == IDYES) {
 						CloseConnection();
 					}
@@ -1011,14 +1060,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 					Disconnect();
 				}
 			} else if (LOWORD(wParam) == IDM_ABOUT) {
-				wchar_t aboutmsg[512];
-				swprintf(aboutmsg, sizeof(aboutmsg) / sizeof(wchar_t),
+				wchar_t about_msg[512];
+				swprintf(about_msg, sizeof(about_msg) / sizeof(wchar_t),
 					L"QuickChat\n"
 					L"Built on %s\n"
 					L"Created by WinXP655\n"
 					L"https://github.com/WinXP655/quickchat",
 					__DATE__);
-				MessageBoxW(hWnd, aboutmsg, L"About QuickChat", MB_OK | MB_ICONINFORMATION);
+				MessageBoxW(hWnd, about_msg, L"About QuickChat", MB_OK | MB_ICONINFORMATION);
 			} else if (LOWORD(wParam) == ID_SOUND_TOGGLE) {
 				soundEnabled = !soundEnabled;
 				CheckMenuItem(GetMenu(hWnd), ID_SOUND_TOGGLE, MF_BYCOMMAND | (soundEnabled ? MF_CHECKED : MF_UNCHECKED));
@@ -1028,11 +1077,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				CheckMenuItem(GetMenu(hWnd), ID_FLASH_TOGGLE, MF_BYCOMMAND | (flashEnabled ? MF_CHECKED : MF_UNCHECKED));
 				return 0;
 			} else if (LOWORD(wParam) == IDM_COMPUTER_INFO) {
-				// We get information from all available data
+				// Using existing variables to display data.
 				const wchar_t* connected = isRunning ? L"Yes" : L"No";
-				const wchar_t* protocol_label = xorEnabled ? L"QCS" : L"QC";
+				const wchar_t* displayName = (peerName[0] != L'\0') ? peerName : L"N/A";
+				const wchar_t* protocolLabel = xorEnabled ? L"QCS" : L"QC";
+
+				// Problem before was that both server and client used same variable (peerIp),
+				// but they contained different IP addresses, meaning it would display
+				// wrong IP for one of sides. Was affected only client side.
 				const wchar_t* ip = isServer ? peerIp : serverIp;
-				const wchar_t* display_name = (peerName[0] != L'\0') ? peerName : L"N/A";
 
 				wchar_t info_msg[512];
 				swprintf(info_msg, 512,
@@ -1040,7 +1093,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 					L"Remote IP: %ls\n"
 					L"Protocol: %ls\n"
 					L"Connected: %ls",
-					display_name, ip, protocol_label, connected);
+					displayName, ip, protocolLabel, connected);
 
 				MessageBoxW(hWnd, info_msg, L"QuickChat", MB_OK | MB_ICONINFORMATION);
 			} else if (LOWORD(wParam) == IDM_CLEAR_CHAT) {
@@ -1081,7 +1134,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		}
 
 		case WM_DESTROY: {
-			// Preventing GDI leaks
+			// Prevent GDI leaks
 			if (oldEditProc) {
 				SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)oldEditProc);
 			}
@@ -1099,7 +1152,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			CleanupAndExit();
 			return 0;
 		}
-		
+
 		case WM_SIZE: {
 			int w = LOWORD(lParam);
 			int h = HIWORD(lParam);
@@ -1157,15 +1210,18 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	if (uMsg == WM_GETDLGCODE) {
 		return DLGC_WANTALLKEYS | CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
 	} else if (uMsg == WM_KEYDOWN) {
-		// Overriding defaults for custom handlers
+		// Setting our own handlers
 
 		// Ctrl+A
+		// Microsoft never made it Select all out-of-box, so developers
+		// have choice what they would do with this combination.
 		if (wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
 			SendMessageW(hWnd, EM_SETSEL, 0, -1);
 			return 0;
 		}
 
 		// Enter
+		// By default it inserts a new line, behavior since Windows 3.x.
 		if (wParam == VK_RETURN) {
 			if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
 				return CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
