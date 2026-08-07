@@ -104,6 +104,28 @@ Fix: Reset routing table completely.
 This is a known limitation of multi-line EDIT control, no known fix exist except subclassing, but it will be handled only for specific control. Default behavior since Windows 3.x.\
 Fix: Not available.
 
+## How to activate high-DPI fonts
+By default, manifest provide only Common Controls v6.
+DPI-aware manifest wasn't added because Windows XP compatibility breaks with SxS error.
+
+Steps to activate high DPI (Windows 10/11):
+1. Open `quickchat.exe` properties.
+2. Select "Compatiblity" tab.
+3. Click "Change high DPI settings".
+4. Check "Override high DPI scaling behavior" and select "Application" from list.
+5. Click OK and then Apply.
+
+Steps to activate high DPI (Windows 7/8):
+1. Open `quickchat.exe` properties.
+2. Select "Compatiblity" tab.
+3. Check "Disable display scaling on high DPI settings".
+4. Click Apply.
+
+Note that only fonts are scaled - controls are fixed in size
+
+<img width="584" height="387" alt="image" src="https://github.com/user-attachments/assets/2acadc53-e092-416e-98aa-5a82ce0661b4" />\
+*QuickChat in 125% scaling on Windows 10*
+
 ## Credits
 This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
 `7z.exe` is included for convenience and is used under the terms of the GNU LGPL license.
