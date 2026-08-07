@@ -90,6 +90,20 @@ Read CHANGELOG.md.
     `build.bat /minbuild` - Compile QuickChat with most minimal configuration.\
     `build.bat /clean` - Delete existing compiled files.
 
+## Quirks
+- Adding error code to log write fail breaks themeing.\
+Adding showing error code in logging start failure breaks Common Controls v6 (disabling themeing).\
+(Windows, you are surprising me)\
+Fix: None for now.
+
+- Client and Server show same IP address, when no route but computers connected anyways.\
+Sometimes IP address displayed incorrectly when routing table is wrong.\
+Fix: Reset routing table completely.
+
+- Tab inserted as a character instead switching controls.\
+This is a known limitation of multi-line EDIT control, no known fix exist except subclassing, but it will be handled only for specific control. Default behavior since Windows 3.x.\
+Fix: Not available.
+
 ## Credits
 This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
 `7z.exe` is included for convenience and is used under the terms of the GNU LGPL license.
