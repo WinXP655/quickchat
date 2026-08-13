@@ -1,10 +1,14 @@
 # <img width="48" height="48" alt="icon48" src="https://github.com/user-attachments/assets/e01482e7-3821-4102-be18-e42e7553139b" /> QuickChat
-QuickChat is a minimalistic LAN messenger, written on pure C with the Win32 API.
+QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
 Does not require installation, leaves no traces, and works on any version starting from Windows 2000 up to 11.
 
 <img width="586" height="388" alt="image" src="https://github.com/user-attachments/assets/5fae96ec-dd38-4159-b84c-e47dc066941e" />
 
 Based on [MicroChat Framework](https://github.com/WinXP655/microchat).
+
+## Project Status
+Active development is now focuses on maintenance, bug fixes and security patches.\
+No major features are planned.
 
 ## Features
 1. **Portable** - just 1 .exe file
@@ -45,16 +49,13 @@ Chat log stored only on server side and do not contain sensitive information. It
 ## Protocol
 It uses a very simple yet working custom protocol QuickChat/QuickChat Secure (QC/QCS):
 1. Who starts first: Client. Server never sends anything until it will be QC handshake.
-2. Client sent handshake in following format: QC:PCNAME\0.
-   Replace PCNAME with your computer name or what you want remote side to see.
-   
-   "\0" is required - official backend written on C, meaning you have to follow C rules.
-   
-   If you are using QCS, you need to XOR everything before.
-   
-   First 3 bytes should be exactly "QC:" or XORed version of it. Server reject if it is non-QC or at least 1 byte is wrong.
-4. Server send its name in same format.
-5. Chat starts.
+2. Client sends handshake in following format: QC:PCNAME\0.
+   Replace PCNAME with your computer name or what you want remote side to see.\
+   "\0" is required - official backend written on C, meaning you have to follow C rules.\
+   If you are using QCS, you need to XOR everything before.\
+   First 3 bytes should be exactly "QC:" or XORed version of it. Server reject if it is non-QC or at least 1 byte is wrong.\
+3. Server send its name in same format.
+4. Chat starts.
 
 It also supports custom ping:
 1. Send "QCPING" or its XORed version to remote side.
@@ -84,11 +85,11 @@ Read CHANGELOG.md.
 3. Open a command prompt in the project folder.
 4. Run depending on what you need:
    `build.bat` - Compile QuickChat without changing key and packing.\
-   `build.bat /rekey` - Compile QuickChat and regenrate key without packing.\
+   `build.bat /rekey` - Compile QuickChat and regenerate key without packing.\
    `build.bat /pack` - Compile QuickChat and pack without regenerating key.\
    `build.bat /rekey /pack` - Compile QuickChat, regenerate key and pack.\
-    `build.bat /minbuild` - Compile QuickChat with most minimal configuration.\
-    `build.bat /clean` - Delete existing compiled files.
+   `build.bat /minbuild` - Compile QuickChat with most minimal configuration.\
+   `build.bat /clean` - Delete existing compiled files.
 
 ## Quirks
 - Adding error code to log write fail breaks themeing.\
