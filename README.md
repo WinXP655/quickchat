@@ -98,8 +98,7 @@ Read CHANGELOG.md.
 ## Quirks
 - Adding error code to log write fail breaks themeing.\
 Adding showing error code in logging start failure breaks Common Controls v6 (disabling themeing).\
-(Windows, you are surprising me)\
-Fix: None for now.
+Fixed: Yes.
 
 - Client and Server show same IP address, when no route but computers connected anyways.\
 Sometimes IP address displayed incorrectly when routing table is wrong.\
