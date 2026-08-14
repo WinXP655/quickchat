@@ -1413,27 +1413,23 @@ static bool IsValidTextExtension(const wchar_t *path) {
 }
 
 static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
-	HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ,
-							   NULL, OPEN_EXISTING, 0, NULL);
+	HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		MessageBoxW(hWnd, L"Cannot open file (locked or inaccessible).",
-					L"QuickChat", MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"Cannot open file (locked or inaccessible).", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
 	DWORD size = GetFileSize(hFile, NULL);
 	if (size == 0 || size == INVALID_FILE_SIZE) {
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"File is empty.", L"QuickChat",
-					MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"File is empty.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
 	char *ansi = (char*)malloc(size + 1);
 	if (!ansi) {
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"Memory allocation failed.", L"QuickChat",
-					MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Memory allocation failed.", L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 
@@ -1441,8 +1437,7 @@ static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	if (!ReadFile(hFile, ansi, size, &read, NULL)) {
 		free(ansi);
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"Failed to read file.", L"QuickChat",
-					MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Failed to read file.", L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 	ansi[read] = '\0';
@@ -1458,16 +1453,14 @@ static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	int wide_len = MultiByteToWideChar(CP_UTF8, 0, ansi + bom_offset, -1, NULL, 0);
 	if (wide_len <= 0) {
 		free(ansi);
-		MessageBoxW(hWnd, L"File is not valid UTF-8 text.", L"QuickChat",
-					MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"File is not valid UTF-8 text.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
 	wchar_t *wide = (wchar_t*)malloc(wide_len * sizeof(wchar_t));
 	if (!wide) {
 		free(ansi);
-		MessageBoxW(hWnd, L"Memory allocation failed.", L"QuickChat",
-					MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Memory allocation failed.", L"QuickChat",MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 
