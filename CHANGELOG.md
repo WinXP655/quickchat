@@ -1,6 +1,32 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 7 August 2026)**:
+**QuickChat (Current, 14 August 2026)**:
+- New sounds.
+  Created using Audacity and 2-3 tones.
+- Slightly updated icon.
+- Added drag-and-drop text files to message edit.
+  It extracts file contents and write contents to edit field.
+  Limitations:
+  1. 4096 characters
+  2. Only .txt, .log, .md, .c, .cpp, .h, .hpp, .py, .js, .sh, .bat, .cmd, .ps1,
+          .json, .xml, .yaml, .yml, .toml, .ini, .cfg, .conf, .css, .html, .htm
+  3. Files locked by other apps cannot be opened.
+- Added disabling controls when connection lost happens.
+- Added saving chat history to file.
+- Fixed detecting previous build files in build system.
+- Renamed left.wav to leave.wav.
+- Added disabling drag-and-drop after disconnect.
+- Removed unused "[DISCONNECTED]" string.
+- Added logging host IP when logging enabled.
+- Added showing error code in log open fail.
+  Now it does not break Common Controls v6.
+- Minimum Windows subsystem changed from 4.0 (9x/NT4) to 5.0 (2000).
+- Added saving settings to quickchat.ini.
+- Rename variables.
+- Added readme to package.
+- Updated XOR key.
+
+**QuickChat (7 August 2026)**:
 - Removed playing leave sound on side, which click Leave Chat.\
   Now leave sound plays only on remote side.
 - Added DPI-aware fonts.
