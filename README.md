@@ -24,7 +24,7 @@ No major features are planned.
 
 ## How to use
 
-### 1. Server
+### 1. Host
 1. Run QuickChat.
 2. Click Yes.
 3. Select protocol.
@@ -35,7 +35,7 @@ No major features are planned.
 ### 2. Client
 1. Run QuickChat.
 2. Click No.
-3. Type the Server IP and click Connect.
+3. Type the Host IP and click Connect.
 4. Select protocol.
 
 ## Logging
@@ -69,7 +69,7 @@ Read CHANGELOG.md.
 ## Building from source
 
 ### Requirements
-- **MinGW-w64**
+- **MinGW-w64/MSVC** compiler
 - **Windows** (7/10/11 recommended for build tools)
 
 ### Included tools
