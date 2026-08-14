@@ -73,7 +73,7 @@ Read CHANGELOG.md.
 ## Building from source
 
 ### Requirements
-- **MinGW-w64/MSVC** compiler
+- **MinGW-w64** compiler
 - **Windows** (7/10/11 recommended for build tools)
 
 ### Included tools
