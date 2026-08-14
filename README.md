@@ -1,4 +1,4 @@
-# <img width="48" height="48" alt="icon48" src="https://github.com/user-attachments/assets/e01482e7-3821-4102-be18-e42e7553139b" /> QuickChat
+# <img width="48" height="48" alt="icon-48x48x32" src="https://github.com/user-attachments/assets/5d840285-ea25-4967-b2ad-bc79b684905f" /> QuickChat
 QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
 Does not require installation, leaves no traces, and works on any version starting from Windows 2000 up to 11.
 
