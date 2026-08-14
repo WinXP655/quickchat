@@ -61,9 +61,23 @@ if %MINBUILD%==1 (
     echo Generating key...
     if not exist key.h python keygen.py
     echo Compiling QuickChat...
-    gcc quickchat.c minbuildconn.o -o quickchat.exe -m32 -lgdi32 -lwinmm -lws2_32 -lcomctl32 -Wall -Wextra -municode
+    gcc quickchat.c minbuildconn.o -o quickchat.exe -m32 -lgdi32 -lwinmm -lws2_32 -lcomctl32 -lshell32 -Wall -Wextra -municode
     echo Done.
     goto end
+)
+
+if exist .\quickchat.exe set PREVBLD=1
+if exist .\QuickChat.zip set PREVBLD=1
+if exist .\key.h set PREVBLD=1
+if exist .\servconn.o set PREVBLD=1
+if exist .\resource.o set PREVBLD=1
+if exist .\chatlog.txt set PREVBLD=1
+
+if "%PREVBLD%"=="1" (
+    echo.
+    echo Warning! One or several previous build files have been detected.
+    echo It is recommended to run "build.bat /clean" before building.
+    echo.
 )
 
 if %REKEY%==1 (
@@ -83,32 +97,6 @@ if not exist key.h (
     echo [OK] key.h exists, skipping generation (use build /rekey to generate new)
 )
 
-if exist quickchat.exe (
-    set PREVBLD=1
-)
-
-if exist QuickChat.zip (
-    set PREVBLD=1
-)
-
-if exist key.h (
-    set PREVBLD=1
-)
-
-if exist servconn.o (
-    set PREVBLD=1
-)
-
-if exist resource.o (
-    set PREVBLD=1
-)
-
-if exist chatlog.txt (
-    set PREVBLD=1
-)
-
-if PREVBLD==1 echo Warning! One or several previous build files have been detected. Please run "build /clean" to remove them
-
 echo Building dialog...
 windres --target=pe-i386 servconn.rc -o servconn.o
 if %errorlevel% neq 0 (
@@ -126,7 +114,7 @@ if %errorlevel% neq 0 (
 echo [OK] Resources built
 
 echo Compiling QuickChat...
-gcc quickchat.c servconn.o resource.o -o quickchat.exe -m32 -lgdi32 -lwinmm -lws2_32 -lcomctl32 -mwindows -s -Wl,--gc-sections -Wall -Wextra -municode
+gcc quickchat.c servconn.o resource.o -o quickchat.exe -m32 -lgdi32 -lwinmm -lws2_32 -lcomctl32 -lshell32 -mwindows -s -Wl,--gc-sections -Wl,--subsystem,windows:5.0 -Wall -Wextra -municode
 if %errorlevel% neq 0 (
     echo [ERROR] Build FAILED
     exit /b 1
@@ -135,9 +123,9 @@ echo [OK] Build successful: quickchat.exe
 
 if %PACK%==1 (
     echo Packing final package...
-    7z a QuickChat.zip "Error Reference.txt" > nul
+    7z a QuickChat.zip readme.txt > nul
     7z a QuickChat.zip join.wav > nul
-    7z a QuickChat.zip left.wav > nul
+    7z a QuickChat.zip leave.wav > nul
     7z a QuickChat.zip newmsg.wav > nul
     7z a QuickChat.zip quickchat.exe > nul
     if %errorlevel% neq 0 (
@@ -151,5 +139,4 @@ if %PACK%==1 (
 )
 
 :end
-
 endlocal
