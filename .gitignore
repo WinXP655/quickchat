@@ -1,6 +1,15 @@
+# Compiled files
+QuickChat.zip
+quickchat.exe
 resource.o
 servconn.o
-quickchat.exe
-QuickChat.zip
+
+# QCS Key
 key.h
+
+# Saved chats
+Chat-*.txt
 chatlog.txt
+
+# QuickChat settings
+quickchat.ini
