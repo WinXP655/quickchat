@@ -1,6 +1,21 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 14 August 2026)**:
+**QuickChat (Current, 18 August 2026)**:
+- Added key combinations using different method.\
+  Ctrl+Shift+Delete - Close Connection\
+  Ctrl+L - Clear Chat\
+  (works only in message edit. Win32, thanks for making global shortcuts absolute hell to override)
+- Changed error messages text a bit. (primarily ReadTextFileContent)
+- Added error code in ReadTextFileContent if failed to read or open file.
+- Made settings entries more consistent in style.
+- Added confirmation of text replace.
+- Moved file processing to separate functions instead WndProc.
+- Added special case for sharing violation in ReadTextFileContent.
+- Added "log not opened" and "write fail" handling to logging.
+- Fixed build script when displaying text in braces by using escape character.\
+  ^(Text^)
+
+**QuickChat (14 August 2026)**:
 - New sounds.
   Created using Audacity and 2-3 tones.
 - Slightly updated icon.
