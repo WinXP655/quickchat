@@ -88,7 +88,7 @@ Read CHANGELOG.md.
 1. Clone or download a repository
 2. Make sure `gcc`, `windres`, and `python` are available in PATH.
 3. Open a command prompt in the project folder.
-4. Run depending on what you need:
+4. Run depending on what you need:\
    `build.bat` - Compile QuickChat without changing key and packing.\
    `build.bat /rekey` - Compile QuickChat and regenerate key without packing.\
    `build.bat /pack` - Compile QuickChat and pack without regenerating key.\
