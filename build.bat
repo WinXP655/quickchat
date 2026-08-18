@@ -94,7 +94,7 @@ if not exist key.h (
     )
     echo [OK] Key generated
 ) else (
-    echo [OK] key.h exists, skipping generation (use build /rekey to generate new)
+    echo [OK] key.h exists, skipping generation ^(use build /rekey to generate new^)
 )
 
 echo Building dialog...

@@ -13,6 +13,7 @@
 #include <commctrl.h>
 #include <process.h>
 #include <shellapi.h>
+#include <errno.h>
 #include "key.h" // XOR key here
 
 // ======= 2. Defines =======
@@ -63,6 +64,7 @@ bool is_running = true;
 bool sound_enabled = true;
 bool flash_enabled = true;
 bool always_on_top = false;
+int error_counter = 0;
 
 // ----- Network state -----
 SOCKET client_socket = INVALID_SOCKET;
@@ -114,6 +116,7 @@ void CloseConnection();
 void Disconnect();
 void ShowError(const wchar_t* msg, DWORD err);
 void LoadSettings();
+void ProcessDroppedFile(HWND hWnd, HDROP hDrop);
 static bool IsValidTextExtension(const wchar_t *path);
 static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd);
 static void InsertTextIntoEdit(const wchar_t *text);
@@ -236,9 +239,9 @@ void LoadSettings() {
 
 		if (wcscmp(key, L"always_on_top") == 0)
 			always_on_top = _wtoi(val) != 0;
-		else if (wcscmp(key, L"Flash") == 0)
+		else if (wcscmp(key, L"flash") == 0)
 			flash_enabled = _wtoi(val) != 0;
-		else if (wcscmp(key, L"Sound") == 0)
+		else if (wcscmp(key, L"sound") == 0)
 			sound_enabled = _wtoi(val) != 0;
 	}
 	fclose(f);
@@ -250,8 +253,8 @@ void SaveSettings() {
 
 	fwprintf(f, L"[QuickChat]\n");
 	fwprintf(f, L"always_on_top=%d\n", always_on_top ? 1 : 0);
-	fwprintf(f, L"Flash=%d\n", flash_enabled ? 1 : 0);
-	fwprintf(f, L"Sound=%d\n", sound_enabled ? 1 : 0);
+	fwprintf(f, L"flash=%d\n", flash_enabled ? 1 : 0);
+	fwprintf(f, L"sound=%d\n", sound_enabled ? 1 : 0);
 	fclose(f);
 }
 
@@ -294,7 +297,12 @@ void PlayNotifySound(int sound) {
 }
 
 void LogMessage(const wchar_t* message) {
-	if (!logging_enabled || chat_log == NULL) return;
+	if (!logging_enabled) return;
+
+	if (chat_log == NULL) {
+		AddMessage(L"[ERROR]: Log file is not opened. Writing data is not available.");
+		return;
+	}
 
 	SYSTEMTIME st;
 	GetLocalTime(&st);
@@ -311,7 +319,25 @@ void LogMessage(const wchar_t* message) {
 	WideCharToMultiByte(CP_UTF8, 0, timestamp, -1, timestamp_utf8, sizeof(timestamp_utf8), NULL, NULL);
 	WideCharToMultiByte(CP_UTF8, 0, message, -1, msg_utf8, sizeof(msg_utf8), NULL, NULL);
 
-	fprintf(chat_log, "[%s] %s\n", timestamp_utf8, msg_utf8);
+	int written = fprintf(chat_log, "[%s] %s\n", timestamp_utf8, msg_utf8);
+	if (written < 0 || ferror(chat_log)) {
+		error_counter++;
+		int err_code = errno;
+		if (err_code == 0) err_code = EIO;
+
+		wchar_t err_msg[512];
+		swprintf(err_msg, sizeof(err_msg) / sizeof(wchar_t), L"[ERROR]: Failed to write to log. Error: %d. Error count: %d.", err_code, error_counter);
+		AddMessage(err_msg);
+
+		if (error_counter >= 3) {
+			AddMessage(L"[ERROR]: Logging was disabled for this session.");
+			logging_enabled = false;
+			fclose(chat_log);
+			chat_log = NULL;
+		}
+		return;
+	}
+
 	fflush(chat_log);
 }
 
@@ -538,7 +564,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			DWORD err = WSAGetLastError();
 			if (err == WSAEADDRINUSE) {
 				MessageBoxW(NULL,
-					L"Port is already in use.\nAnother QuickChat host may be running.",
+					L"Port is already in use. Another QuickChat host may be running.",
 					L"QuickChat", MB_OK | MB_ICONWARNING);
 			} else {
 				ShowError(L"Bind failed.", err);
@@ -1262,39 +1288,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		
 		case WM_DROPFILES: {
 			HDROP hDrop = (HDROP)wParam;
-			wchar_t path[MAX_PATH];
-			DragQueryFileW(hDrop, 0, path, MAX_PATH);
-
-			if (!IsValidTextExtension(path)) {
-				MessageBoxW(hWnd,
-					L"Format not supported.\n\n"
-					L"Supported extensions:\n"
-					L".txt, .log, .md, .c, .cpp, .h, .hpp,\n"
-					L".py, .js, .sh, .bat, .cmd, .ps1,\n"
-					L".json, .xml, .yaml, .yml, .toml,\n"
-					L".ini, .cfg, .conf, .css, .html, .htm",
-					L"QuickChat", MB_OK | MB_ICONWARNING);
-				DragFinish(hDrop);
-				return 0;
-			}
-
-			wchar_t *content = ReadTextFileContent(path, hWnd);
-			if (!content) {
-				DragFinish(hDrop);
-				return 0;
-			}
-
-			int max_len = (BUFFER_SIZE - 1) - wcslen(computer_name) - 8;
-			if ((int)wcslen(content) > max_len) {
-				free(content);
-				MessageBoxW(hWnd, L"File is too large for message field.", L"QuickChat", MB_OK | MB_ICONWARNING);
-				DragFinish(hDrop);
-				return 0;
-			}
-
-			InsertTextIntoEdit(content);
-			free(content);
-
+			ProcessDroppedFile(hWnd, hDrop);
 			DragFinish(hDrop);
 			return 0;
 		}
@@ -1306,7 +1300,7 @@ void CreateMenuBar(HWND hWnd) {
 	HMENU hMenu = CreateMenu();
 
 	HMENU hConn = CreatePopupMenu();
-	if (is_server) AppendMenuW(hConn, MF_STRING, IDM_CLOSE, L"Close Connection");
+	if (is_server) AppendMenuW(hConn, MF_STRING, IDM_CLOSE, L"Close Connection\tCtrl+W");
 	AppendMenuW(hConn, MF_STRING, IDM_PING_REMOTE, L"Ping Remote");
 	AppendMenuW(hConn, MF_STRING, IDM_COMPUTER_INFO, L"Computer Info");
 	AppendMenuW(hConn, MF_SEPARATOR, 0, NULL);
@@ -1317,7 +1311,7 @@ void CreateMenuBar(HWND hWnd) {
 
 	HMENU hView = CreatePopupMenu();
 	AppendMenuW(hView, MF_STRING | MF_UNCHECKED, IDM_ALWAYS_ON_TOP, L"Always On Top");
-	AppendMenuW(hView, MF_STRING, IDM_CLEAR_CHAT, L"Clear Chat");
+	AppendMenuW(hView, MF_STRING, IDM_CLEAR_CHAT, L"Clear Chat\tCtrl+Shift+Del");
 	AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hView, L"View");
 
 	HMENU hOpts = CreatePopupMenu();
@@ -1340,7 +1334,7 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	if (uMsg == WM_GETDLGCODE) {
 		return DLGC_WANTALLKEYS | CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
 	} else if (uMsg == WM_KEYDOWN) {
-		// Setting our own handlers
+		// Set our own handlers
 
 		// Ctrl+A
 		// Microsoft never made it Select all out-of-box, so developers
@@ -1360,12 +1354,86 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 				return 0;
 			}
 		}
+
+		// Ctrl+W
+		// Close connection. Host only.
+		if (wParam == 'W' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+			if (!is_server) {
+				// Do not allow client to execute command.
+				AddMessage(L"[ERROR]: You do not have permission to execute this command.");
+				return 0;
+			}
+
+			if (is_running && client_socket != INVALID_SOCKET) {
+				PostMessage(GetParent(hWnd), WM_COMMAND, MAKEWPARAM(IDM_CLOSE, 0), 0);
+			}
+			return 0;
+		}
+
+		// Ctrl+Shift+Del
+		// Clear chat window.
+		if (wParam == VK_DELETE && (GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_SHIFT) & 0x8000)) {
+			PostMessage(GetParent(hWnd), WM_COMMAND, MAKEWPARAM(IDM_CLEAR_CHAT, 0), 0);
+			return 0;
+		}
 	}
 
 	return CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
 }
 
 // ======= 9. Drag-and-Drop Functions =======
+void ProcessDroppedFile(HWND hWnd, HDROP hDrop) {
+	UINT fileCount = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+
+	if (fileCount > 1) {
+		MessageBoxW(hWnd, L"Only one file can be dropped at a time.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		return;
+	}
+
+	wchar_t path[MAX_PATH];
+	if (DragQueryFileW(hDrop, 0, path, MAX_PATH) == 0) {
+		return;
+	}
+
+	if (!IsValidTextExtension(path)) {
+		MessageBoxW(hWnd,
+			L"Format not supported.\n\n"
+			L"Supported extensions:\n"
+			L".txt, .log, .md, .c, .cpp, .h, .hpp,\n"
+			L".py, .js, .sh, .bat, .cmd, .ps1,\n"
+			L".json, .xml, .yaml, .yml, .toml,\n"
+			L".ini, .cfg, .conf, .css, .html, .htm",
+			L"QuickChat", MB_OK | MB_ICONWARNING);
+		return;
+	}
+
+	int existingLen = GetWindowTextLengthW(hEdit);
+	if (existingLen > 0) {
+		int result = MessageBoxW(hWnd,
+			L"The current text will be replaced. Do you want to continue?",
+			L"QuickChat",
+			MB_YESNO | MB_ICONQUESTION);
+		if (result != IDYES) {
+			return;
+		}
+	}
+
+	wchar_t *content = ReadTextFileContent(path, hWnd);
+	if (!content) {
+		return;
+	}
+
+	int max_len = (BUFFER_SIZE - 1) - (int)wcslen(computer_name) - 8;
+	if ((int)wcslen(content) > max_len) {
+		free(content);
+		MessageBoxW(hWnd, L"File is too large for message field.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		return;
+	}
+
+	InsertTextIntoEdit(content);
+	free(content);
+}
+
 static bool IsValidTextExtension(const wchar_t *path) {
 	const wchar_t *ext = wcsrchr(path, L'.');
 	if (!ext) return false;
@@ -1415,21 +1483,30 @@ static bool IsValidTextExtension(const wchar_t *path) {
 static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	if (hFile == INVALID_HANDLE_VALUE) {
-		MessageBoxW(hWnd, L"Cannot open file (locked or inaccessible).", L"QuickChat", MB_OK | MB_ICONWARNING);
+		DWORD err = GetLastError();
+		wchar_t error_msg[512];
+
+		if (err == ERROR_SHARING_VIOLATION) {
+			swprintf(error_msg, sizeof(error_msg) / sizeof(wchar_t), L"Cannot open this file because it is being used by another process.");
+		} else {
+			swprintf(error_msg, sizeof(error_msg) / sizeof(wchar_t), L"Cannot open this file. Error: %lu", err);
+		}
+
+		MessageBoxW(hWnd, error_msg, L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 
 	DWORD size = GetFileSize(hFile, NULL);
 	if (size == 0 || size == INVALID_FILE_SIZE) {
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"File is empty.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"This file is empty.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
 	char *ansi = (char*)malloc(size + 1);
 	if (!ansi) {
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"Memory allocation failed.", L"QuickChat", MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Failed to allocate memory.", L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 
@@ -1437,7 +1514,9 @@ static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	if (!ReadFile(hFile, ansi, size, &read, NULL)) {
 		free(ansi);
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"Failed to read file.", L"QuickChat", MB_OK | MB_ICONERROR);
+		wchar_t error_msg[512];
+		swprintf(error_msg, sizeof(error_msg) / sizeof(wchar_t), L"Failed to read file. Error: %d", GetLastError());
+		MessageBoxW(hWnd, error_msg, L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 	ansi[read] = '\0';
@@ -1453,14 +1532,14 @@ static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	int wide_len = MultiByteToWideChar(CP_UTF8, 0, ansi + bom_offset, -1, NULL, 0);
 	if (wide_len <= 0) {
 		free(ansi);
-		MessageBoxW(hWnd, L"File is not valid UTF-8 text.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"This file is not valid UTF-8 text.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
 	wchar_t *wide = (wchar_t*)malloc(wide_len * sizeof(wchar_t));
 	if (!wide) {
 		free(ansi);
-		MessageBoxW(hWnd, L"Memory allocation failed.", L"QuickChat",MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Failed to allocate memory.", L"QuickChat",MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 
