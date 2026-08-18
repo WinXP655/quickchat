@@ -14,10 +14,11 @@ No major features are planned.
 1. **Portable** - just 1 .exe file
 2. **Unicode Support** - any languages, any symbols.
 3. **QC/QCS Protocol**
-- QC (QuickChat) - plaintext.
-- QCS (QuickChat Obfuscated) - XOR obfuscation.
+  - QC (QuickChat) - plaintext.
+  - QCS (QuickChat Obfuscated) - XOR obfuscation.
 4. **Logging** - save chat history and events. Only for Server, disabled by default.
 5. **Tiny Size** - just 142 KB.
+6. **Drag-and-Drop** - drag-and-drop any compatible text file and it will extract text instantly.
 
 ## Requirements
 - **OS** - Windows 2000 and newer.
