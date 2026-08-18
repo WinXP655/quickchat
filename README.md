@@ -17,7 +17,7 @@ No major features are planned.
   - QC (QuickChat) - plaintext.
   - QCS (QuickChat Obfuscated) - XOR obfuscation.
 4. **Logging** - save chat history and events. Only for Server, disabled by default.
-5. **Tiny Size** - just 142 KB.
+5. **Tiny Size** - just 150 KB.
 6. **Drag-and-Drop** - drag-and-drop any compatible text file and it will extract text instantly.
 
 ## Requirements
