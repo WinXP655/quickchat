@@ -75,11 +75,13 @@ Read CHANGELOG.md.
 
 ### Requirements
 - **MinGW-w64** compiler
+- **Python** any version
 - **Windows** (7/10/11 recommended for build tools)
 
 ### Included tools
 - 7z.exe - packaging.
 - keygen.py - XOR key generator.
+- keygen_fixed.py - XOR key generator, but with your own key.
 - build.bat - build script.
 - resource.rc - resources.
 - quickchat.manifest - Common Controls v6 manifest. Mostly for visual styles.
@@ -88,7 +90,10 @@ Read CHANGELOG.md.
 1. Clone or download a repository
 2. Make sure `gcc`, `windres`, and `python` are available in PATH.
 3. Open a command prompt in the project folder.
-4. Run depending on what you need:\
+4. If you want to define your own key before, run:\
+   `python keygen_fixed.py <your own key>`\
+   If you want to make your build compatible with official host, copy QCS key string from release.
+6. Run depending on what you need:\
    `build.bat` - Compile QuickChat without changing key and packing.\
    `build.bat /rekey` - Compile QuickChat and regenerate key without packing.\
    `build.bat /pack` - Compile QuickChat and pack without regenerating key.\
