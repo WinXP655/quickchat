@@ -1,7 +1,5 @@
 // QuickChat LAN Messenger by WinXP655.
-// Minimalistic chat appplication written based on MicroChat.
-// QuickChat Repository: https://github.com/WinXP655/quickchat.
-// MicroChat Framework: https://github.com/WinXP655/microchat.
+// Repository: https://github.com/WinXP655/quickchat.
 // Distributed under MIT License.
 
 // ======= 1. Headers =======
@@ -17,6 +15,16 @@
 #include "key.h" // XOR key here
 
 // ======= 2. Defines =======
+// --- Fixed ---
+#define SOUND_JOIN 0
+#define SOUND_LEAVE 1
+#define SOUND_MSG 2
+#define BUFFER_SIZE 8192 // Unicode = 2 bytes
+#define PORT_QCS 65501
+#define PORT_QC 65502
+#define QC_LABEL "QC:"
+#define INI_FILE L"quickchat.ini"
+
 // --- UI Controls ---
 #define ID_EDIT 101
 #define ID_SEND 102
@@ -37,6 +45,7 @@
 // --- Menu: Options ---
 #define ID_FLASH_TOGGLE 2201
 #define ID_SOUND_TOGGLE 2202
+#define IDM_RESET_SETTINGS 2203
 
 // --- Menu: Help ---
 #define IDM_ABOUT 2301
@@ -44,16 +53,6 @@
 // --- Menu: Other ---
 #define IDM_COMPUTER_INFO 2401
 #define IDM_PING_REMOTE 2402
-
-// --- Non-changable ---
-#define SOUND_JOIN 0
-#define SOUND_LEAVE 1
-#define SOUND_MSG 2
-#define BUFFER_SIZE 8192 // Unicode = 2 bytes
-#define PORT_QCS 65501
-#define PORT_QC 65502
-#define QC_LABEL "QC:"
-#define INI_FILE L"quickchat.ini"
 
 // ======= 3. Global variables =======
 // ----- Control flags -----
@@ -92,40 +91,54 @@ HFONT hFontMono = NULL;
 volatile BOOL mainWindowReady = FALSE;
 
 // ======= 4. Prototypes =======
-void EnableVisualStyles();
-void GetLocalComputerName();
-bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow);
+
+// ----- Core Functions -----
+void LoadSettings(void);
+LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo);
+
+// ----- Helper Functions -----
+void EnableVisualStyles(void);
 void PlayNotifySound(int sound);
-INT_PTR CALLBACK ConnectDialogProc(HWND, UINT, WPARAM, LPARAM);
-void LogMessage(const wchar_t* message);
-bool GetDefaultIP(wchar_t* ip_buffer, size_t size);
-DWORD WINAPI ShowServerIPMessage(LPVOID lpParam);
-void XorObf(unsigned char* data, int len);
-void ShowMainWindow(HINSTANCE hInstance, int nCmdShow);
 void AddMessage(const wchar_t* msg);
-unsigned int __stdcall ReceiveMessages(void* arg);
-void CleanupAndExit();
 void DisableChatControls(BOOL disable);
 void FlashMessageWindow(HWND hWnd);
+void ShowError(const wchar_t* msg, DWORD err);
+bool GetDefaultIP(wchar_t* ip_buffer, size_t size);
 bool IsValidTargetIP(const wchar_t* ip_str);
+void CloseConnection(void);
+void Disconnect(void);
+void CleanupAndExit(void);
+void LogMessage(const wchar_t* message);
+void SaveChatToFile(HWND hWnd);
+void ResetSettings(HWND hWnd);
+void GetLocalComputerName(void);
+
+// ----- Network Core -----
+bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow);
+void XorObf(unsigned char* data, int len);
+unsigned int __stdcall ReceiveMessages(void* arg);
+void SendCurrentMessage(HWND hWnd);
+
+// ----- User Interface -----
+INT_PTR CALLBACK ConnectDialogProc(HWND, UINT, WPARAM, LPARAM);
+DWORD WINAPI ShowServerIPMessage(LPVOID lpParam);
+void ShowMainWindow(HINSTANCE hInstance, int nCmdShow);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void CreateMenuBar(HWND hWnd);
 LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-void SendCurrentMessage(HWND hWnd);
-void CloseConnection();
-void Disconnect();
-void ShowError(const wchar_t* msg, DWORD err);
-void LoadSettings();
+
+// ----- Drag and Drop -----
 void ProcessDroppedFile(HWND hWnd, HDROP hDrop);
 static bool IsValidTextExtension(const wchar_t *path);
 static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd);
 static void InsertTextIntoEdit(const wchar_t *text);
 
-// ======== 5. Entry Point and Settings =======
+// ======== 5. Core Functions =======
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
 	(void)hPrevInstance;
 	(void)lpCmdLine;
 
+	SetUnhandledExceptionFilter(CrashHandler);
 	EnableVisualStyles();
 	GetLocalComputerName();
 
@@ -160,7 +173,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 			chat_log = _wfopen(L"chatlog.txt", L"a");
 			if (chat_log == NULL) {
 				wchar_t log_err[512];
-				swprintf(log_err, 512, L"Failed to open chat log file. Logging will be disabled for this session. Error: %d.", GetLastError());
+				swprintf(log_err, sizeof(log_err) / sizeof(wchar_t), L"Failed to open chat log file. Logging will be disabled for this session. Error: %d.", GetLastError());
 				MessageBoxW(NULL, log_err, L"QuickChat", MB_OK | MB_ICONWARNING);
 
 				logging_enabled = false;
@@ -215,60 +228,88 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	return msg.wParam;
 }
 
-void LoadSettings() {
-	FILE *f = _wfopen(INI_FILE, L"r");
-	if (!f) return;
+void LoadSettings(void) {
+	FILE *settings_file = _wfopen(INI_FILE, L"r");
+	if (settings_file) {
+		wchar_t line[128];
+		while (fgetws(line, sizeof(line) / sizeof(wchar_t), settings_file)) {
+			size_t len = wcslen(line);
+			if (len && line[len-1] == L'\n') line[--len] = L'\0';
+			if (len && line[len-1] == L'\r') line[--len] = L'\0';
 
-	wchar_t line[128];
-	while (fgetws(line, 128, f)) {
-		size_t len = wcslen(line);
-		if (len && line[len-1] == L'\n') line[--len] = L'\0';
-		if (len && line[len-1] == L'\r') line[--len] = L'\0';
+			if (line[0] == L'\0' || line[0] == L';' || line[0] == L'#') continue;
+			if (line[0] == L'[') continue;
 
-		if (line[0] == L'\0' || line[0] == L';' || line[0] == L'#') continue;
-		if (line[0] == L'[') continue;
+			wchar_t *eq = wcschr(line, L'=');
+			if (!eq) continue;
+			*eq = L'\0';
+			wchar_t *key = line;
+			wchar_t *val = eq + 1;
 
-		wchar_t *eq = wcschr(line, L'=');
-		if (!eq) continue;
-		*eq = L'\0';
-		wchar_t *key = line;
-		wchar_t *val = eq + 1;
+			while (*key == L' ') key++;
+			while (*val == L' ') val++;
 
-		while (*key == L' ') key++;
-		while (*val == L' ') val++;
-
-		if (wcscmp(key, L"always_on_top") == 0)
-			always_on_top = _wtoi(val) != 0;
-		else if (wcscmp(key, L"flash") == 0)
-			flash_enabled = _wtoi(val) != 0;
-		else if (wcscmp(key, L"sound") == 0)
-			sound_enabled = _wtoi(val) != 0;
+			if (wcscmp(key, L"always_on_top") == 0)
+				always_on_top = _wtoi(val) != 0;
+			else if (wcscmp(key, L"flash") == 0)
+				flash_enabled = _wtoi(val) != 0;
+			else if (wcscmp(key, L"sound") == 0)
+				sound_enabled = _wtoi(val) != 0;
+		}
+		fclose(settings_file);
 	}
-	fclose(f);
 }
 
-void SaveSettings() {
-	FILE *f = _wfopen(INI_FILE, L"w");
-	if (!f) return;
+void SaveSettings(void) {
+	FILE *settings_file = _wfopen(INI_FILE, L"w");
 
-	fwprintf(f, L"[QuickChat]\n");
-	fwprintf(f, L"always_on_top=%d\n", always_on_top ? 1 : 0);
-	fwprintf(f, L"flash=%d\n", flash_enabled ? 1 : 0);
-	fwprintf(f, L"sound=%d\n", sound_enabled ? 1 : 0);
-	fclose(f);
+	if (settings_file) {
+		fwprintf(settings_file, L"[QuickChat]\n");
+		fwprintf(settings_file, L"always_on_top=%d\n", always_on_top ? 1 : 0);
+		fwprintf(settings_file, L"flash=%d\n", flash_enabled ? 1 : 0);
+		fwprintf(settings_file, L"sound=%d\n", sound_enabled ? 1 : 0);
+		fclose(settings_file);
+	}
+}
+
+LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
+	DWORD code = ExceptionInfo->ExceptionRecord->ExceptionCode;
+	void* address = ExceptionInfo->ExceptionRecord->ExceptionAddress;
+
+	wchar_t user_msg[512];
+	swprintf(user_msg, sizeof(user_msg) / sizeof(wchar_t),
+		L"A critical error has occurred.\n"
+		L"Error code: 0x%08lX\n"
+		L"Address: %p\n\n"
+		L"Click OK to exit QuickChat",
+		code, address);
+	MessageBoxW(NULL, user_msg, L"QuickChat", MB_OK | MB_ICONERROR);
+
+	FILE* crash_log = fopen("crash.txt", "w");
+	if (crash_log) {
+		time_t current = time(NULL);
+		struct tm* time_info = localtime(&current);
+		char timestamp[64];
+		strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", time_info);
+
+		fprintf(crash_log, "--- Crash Report ---\n");
+		fprintf(crash_log, "Time: %s\n", timestamp);
+		fprintf(crash_log, "Error code: 0x%08lX\n", code);
+		fprintf(crash_log, "Address: %p\n", address);
+		fclose(crash_log);
+	}
+
+	return EXCEPTION_EXECUTE_HANDLER;
 }
 
 // ======= 6. Helper Functions =======
+
+// ----- UI Helpers -----
 void EnableVisualStyles() {
 	INITCOMMONCONTROLSEX icex;
 	icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
 	icex.dwICC = ICC_WIN95_CLASSES;
 	InitCommonControlsEx(&icex);
-}
-
-void GetLocalComputerName() {
-	DWORD size = sizeof(computer_name) / sizeof(wchar_t);
-	GetComputerNameW(computer_name, &size);
 }
 
 void PlayNotifySound(int sound) {
@@ -296,51 +337,59 @@ void PlayNotifySound(int sound) {
 	PlaySoundW(filename, NULL, SND_FILENAME | SND_ASYNC);
 }
 
-void LogMessage(const wchar_t* message) {
-	if (!logging_enabled) return;
+void AddMessage(const wchar_t* msg) {
+	// Ensure display is ready.
+	if (!hMsgDisplay || !msg || !*msg) return;
 
-	if (chat_log == NULL) {
-		AddMessage(L"[ERROR]: Log file is not opened. Writing data is not available.");
+	if (wcslen(msg) > BUFFER_SIZE) {
+		wchar_t longmsg_err[511] = L"[ERROR]: Message is too long to be displayed.";
+		AddMessage(longmsg_err);
+		if (is_server) LogMessage(longmsg_err);
 		return;
 	}
+	int len = GetWindowTextLengthW(hMsgDisplay);
 
-	SYSTEMTIME st;
-	GetLocalTime(&st);
+	SendMessageW(hMsgDisplay, EM_SETSEL, len, len);
+	if (len > 0) SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)L"\r\n");
 
-	wchar_t timestamp[64];
-	swprintf(timestamp, sizeof(timestamp) / sizeof(wchar_t),
-		L"%04d-%02d-%02d %02d:%02d:%02d.%03d",
-		st.wYear, st.wMonth, st.wDay,
-		st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-
-	// Writing logs in UTF-8 for compatibility.
-	char timestamp_utf8[64];
-	char msg_utf8[1024];
-	WideCharToMultiByte(CP_UTF8, 0, timestamp, -1, timestamp_utf8, sizeof(timestamp_utf8), NULL, NULL);
-	WideCharToMultiByte(CP_UTF8, 0, message, -1, msg_utf8, sizeof(msg_utf8), NULL, NULL);
-
-	int written = fprintf(chat_log, "[%s] %s\n", timestamp_utf8, msg_utf8);
-	if (written < 0 || ferror(chat_log)) {
-		error_counter++;
-		int err_code = errno;
-		if (err_code == 0) err_code = EIO;
-
-		wchar_t err_msg[512];
-		swprintf(err_msg, sizeof(err_msg) / sizeof(wchar_t), L"[ERROR]: Failed to write to log. Error: %d. Error count: %d.", err_code, error_counter);
-		AddMessage(err_msg);
-
-		if (error_counter >= 3) {
-			AddMessage(L"[ERROR]: Logging was disabled for this session.");
-			logging_enabled = false;
-			fclose(chat_log);
-			chat_log = NULL;
+	if (!SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)msg)) {
+		if (is_server) {
+			wchar_t addmsg_err[512];
+			swprintf(addmsg_err, sizeof(addmsg_err) / sizeof(wchar_t), L"[ERROR]: Failed to display message. Error: %lu.", GetLastError());
+			if (is_server) LogMessage(addmsg_err);
 		}
+		SetFocus(hEdit);
 		return;
 	}
 
-	fflush(chat_log);
+	SendMessageW(hMsgDisplay, WM_VSCROLL, SB_BOTTOM, 0);
 }
 
+void DisableChatControls(BOOL disable) {
+	if (hEdit && IsWindow(hEdit)) EnableWindow(hEdit, !disable);
+	if (hSendBtn && IsWindow(hSendBtn)) EnableWindow(hSendBtn, !disable);
+}
+
+void FlashMessageWindow(HWND hWnd) {
+	if (!flash_enabled) return;
+
+	FLASHWINFO fi;
+	fi.cbSize = sizeof(FLASHWINFO);
+	fi.hwnd = hWnd;
+	fi.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG;
+	fi.uCount = 3;
+	fi.dwTimeout = 0;
+
+	FlashWindowEx(&fi);
+}
+
+void ShowError(const wchar_t* msg, DWORD err) {
+	wchar_t buffer[512];
+	swprintf(buffer, sizeof(buffer) / sizeof(wchar_t), L"%ls. Error: %lu", msg, err);
+	MessageBoxW(NULL, buffer, L"QuickChat", MB_OK | MB_ICONERROR);
+}
+
+// ----- Network Helpers -----
 bool GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 	// UDP hack: connect to 8.8.8.8:53 (DNS), then getsockname returns local IP.
 	// Works only when there is a route to the internet. Returns 0.0.0.0 if no route.
@@ -386,83 +435,6 @@ bool GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 	return true;
 }
 
-void AddMessage(const wchar_t* msg) {
-	// Safe display: checks window handle, buffer size, SendMessage result.
-
-	if (!hMsgDisplay || !IsWindow(hMsgDisplay) || !msg || !*msg) return;
-	if (wcslen(msg) > BUFFER_SIZE) {
-		wchar_t longmsg_err[511] = L"[ERROR]: Message is too long to be displayed.";
-		AddMessage(longmsg_err);
-		if (is_server) LogMessage(longmsg_err);
-		return;
-	}
-	int len = GetWindowTextLengthW(hMsgDisplay);
-
-	SendMessageW(hMsgDisplay, EM_SETSEL, len, len);
-	if (len > 0) SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)L"\r\n");
-
-	if (!SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)msg)) {
-		if (is_server) {
-			wchar_t addmsg_err[512];
-			swprintf(addmsg_err, sizeof(addmsg_err) / sizeof(wchar_t), L"[ERROR]: Failed to display message. Error: %lu.", GetLastError());
-			if (is_server) LogMessage(addmsg_err);
-		}
-		SetFocus(hEdit);
-		return;
-	}
-
-	SendMessageW(hMsgDisplay, WM_VSCROLL, SB_BOTTOM, 0);
-}
-
-void CleanupAndExit() {
-	SaveSettings();
-	is_running = 0;
-
-	if (client_socket != INVALID_SOCKET) {
-		shutdown(client_socket, SD_BOTH);
-		closesocket(client_socket);
-		client_socket = INVALID_SOCKET;
-	}
-
-	// Never do object wait on thread with recv.
-	// It is always bad idea - adds extra delay (~5 sec).
-	if (hReceiveThread != NULL) {
-		CloseHandle(hReceiveThread);
-		hReceiveThread = NULL;
-	}
-
-	if (chat_log != NULL) {
-		time_t now = time(NULL);
-		struct tm *t = localtime(&now);
-		wchar_t timestamp[64];
-		wcsftime(timestamp, sizeof(timestamp) / sizeof(wchar_t), L"%H:%M:%S %d/%m/%Y", t);
-		fwprintf(chat_log, L"=== Session ended at %ls ===\n\n", timestamp);
-		fclose(chat_log);
-		chat_log = NULL;
-	}
-
-	WSACleanup();
-	PostQuitMessage(0);
-}
-
-void DisableChatControls(BOOL disable) {
-	if (hEdit && IsWindow(hEdit)) EnableWindow(hEdit, !disable);
-	if (hSendBtn && IsWindow(hSendBtn)) EnableWindow(hSendBtn, !disable);
-}
-
-void FlashMessageWindow(HWND hWnd) {
-	if (!flash_enabled) return;
-
-	FLASHWINFO fi;
-	fi.cbSize = sizeof(FLASHWINFO);
-	fi.hwnd = hWnd;
-	fi.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG;
-	fi.uCount = 3;
-	fi.dwTimeout = 0;
-
-	FlashWindowEx(&fi);
-}
-
 bool IsValidTargetIP(const wchar_t* ip_str) {
 	int o1, o2, o3, o4;
 	if (swscanf(ip_str, L"%d.%d.%d.%d", &o1, &o2, &o3, &o4) != 4) return false;
@@ -484,9 +456,8 @@ bool IsValidTargetIP(const wchar_t* ip_str) {
 	return true;
 }
 
-void CloseConnection() {
-	// Only server/host (call whatever you want) allowed to disconnect client from chat.
-	// This is by design.
+void CloseConnection(void) {
+	// Only host can disconnect client.
 	if (!is_server) return;
 
 	if (client_socket == INVALID_SOCKET) {
@@ -511,13 +482,12 @@ void CloseConnection() {
 	LogMessage(closeconn);
 }
 
-void Disconnect() {
+void Disconnect(void) {
 	wchar_t leave_msg[512];
 	swprintf(leave_msg, sizeof(leave_msg) / sizeof(wchar_t), L"[DISCONNECT]: %ls left the chat.", computer_name);
 	AddMessage(leave_msg);
 
 	if (client_socket != INVALID_SOCKET && is_running) {
-		// Convert wchat_t to UTF-8 before sending.
 		char utf8_msg[256];
 		WideCharToMultiByte(CP_UTF8, 0, leave_msg, -1, utf8_msg, sizeof(utf8_msg), NULL, NULL);
 		int msg_len = strlen(utf8_msg);
@@ -532,10 +502,147 @@ void Disconnect() {
 	CleanupAndExit();
 }
 
-void ShowError(const wchar_t* msg, DWORD err) {
-	wchar_t buffer[512];
-	swprintf(buffer, sizeof(buffer) / sizeof(wchar_t), L"%ls. Error: %lu", msg, err);
-	MessageBoxW(NULL, buffer, L"QuickChat", MB_OK | MB_ICONERROR);
+void CleanupAndExit(void) {
+	SaveSettings();
+	is_running = 0;
+
+	if (client_socket != INVALID_SOCKET) {
+		shutdown(client_socket, SD_BOTH);
+		closesocket(client_socket);
+		client_socket = INVALID_SOCKET;
+	}
+
+	// Avoid WaitForSingleObject on recv thread.
+	if (hReceiveThread != NULL) {
+		CloseHandle(hReceiveThread);
+		hReceiveThread = NULL;
+	}
+
+	if (chat_log != NULL) {
+		time_t now = time(NULL);
+		struct tm *t = localtime(&now);
+		wchar_t timestamp[64];
+		wcsftime(timestamp, sizeof(timestamp) / sizeof(wchar_t), L"%H:%M:%S %d/%m/%Y", t);
+		fwprintf(chat_log, L"=== Session ended at %ls ===\n\n", timestamp);
+		fclose(chat_log);
+		chat_log = NULL;
+	}
+
+	WSACleanup();
+	PostQuitMessage(0);
+}
+
+// ----- Logging -----
+void LogMessage(const wchar_t* message) {
+	if (!logging_enabled) return;
+
+	if (chat_log == NULL) {
+		AddMessage(L"[ERROR]: Log file is not opened. Writing data is not available.");
+		return;
+	}
+
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+
+	wchar_t timestamp[64];
+	swprintf(timestamp, sizeof(timestamp) / sizeof(wchar_t),
+		L"%04d-%02d-%02d %02d:%02d:%02d.%03d",
+		st.wYear, st.wMonth, st.wDay,
+		st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+	char timestamp_utf8[64];
+	char msg_utf8[1024];
+	WideCharToMultiByte(CP_UTF8, 0, timestamp, -1, timestamp_utf8, sizeof(timestamp_utf8), NULL, NULL);
+	WideCharToMultiByte(CP_UTF8, 0, message, -1, msg_utf8, sizeof(msg_utf8), NULL, NULL);
+
+	int written = fprintf(chat_log, "[%s] %s\n", timestamp_utf8, msg_utf8);
+	if (written < 0 || ferror(chat_log)) {
+		error_counter++;
+		int err_code = errno;
+		if (err_code == 0) err_code = EIO;
+
+		wchar_t err_msg[512];
+		swprintf(err_msg, sizeof(err_msg) / sizeof(wchar_t), L"[ERROR]: Failed to write to log. Error: %d. Error count: %d.", err_code, error_counter);
+		AddMessage(err_msg);
+
+		if (error_counter >= 3) {
+			AddMessage(L"[ERROR]: Logging was disabled for this session.");
+			logging_enabled = false;
+			fclose(chat_log);
+			chat_log = NULL;
+		}
+		return;
+	}
+
+	fflush(chat_log);
+}
+
+// ----- File Operations -----
+void SaveChatToFile(HWND hWnd) {
+	wchar_t filename[MAX_PATH];
+	time_t now = time(NULL);
+	struct tm *tm_info = localtime(&now);
+	wcsftime(filename, MAX_PATH, L"Chat-%Y%m%d-%H%M%S.txt", tm_info);
+
+	int len = GetWindowTextLengthW(hMsgDisplay);
+	wchar_t *chatText = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
+	GetWindowTextW(hMsgDisplay, chatText, len + 1);
+
+	FILE *f = _wfopen(filename, L"wb");
+	if (f) {
+		// Use only for UTF-8 with BOM.
+		// fwrite("\xEF\xBB\xBF", 1, 3, f);
+
+		char *utf8 = (char*)malloc(len * 3 + 1);
+		WideCharToMultiByte(CP_UTF8, 0, chatText, -1, utf8, len * 3 + 1, NULL, NULL);
+		fwrite(utf8, 1, strlen(utf8), f);
+		free(utf8);
+		fclose(f);
+
+		wchar_t save_msg[512];
+		swprintf(save_msg, sizeof(save_msg) / sizeof(wchar_t), L"Chat saved to %ls", filename);
+		MessageBoxW(hWnd, save_msg, L"QuickChat", MB_OK | MB_ICONINFORMATION);
+	} else {
+		wchar_t save_err[512];
+		swprintf(save_err, sizeof(save_err) / sizeof(wchar_t), L"Failed to save chat history. Error: %d.", GetLastError());
+		MessageBoxW(hWnd, save_err, L"QuickChat", MB_OK | MB_ICONERROR);
+	}
+
+	free(chatText);
+}
+
+// ----- Settings -----
+void ResetSettings(HWND hWnd) {
+	int result = MessageBoxW(hWnd,
+		L"Are you sure you want to reset all settings?",
+		L"QuickChat",
+		MB_YESNO | MB_ICONWARNING);
+
+	if (result == IDYES) {
+		// Remove settings file
+		_wremove(INI_FILE);
+
+		// Reset variables
+		always_on_top = false;
+		flash_enabled = true;
+		sound_enabled = true;
+
+		// Reset menu
+		CheckMenuItem(GetMenu(hWnd), IDM_ALWAYS_ON_TOP, MF_BYCOMMAND | MF_UNCHECKED);
+		CheckMenuItem(GetMenu(hWnd), ID_FLASH_TOGGLE, MF_BYCOMMAND | MF_CHECKED);
+		CheckMenuItem(GetMenu(hWnd), ID_SOUND_TOGGLE, MF_BYCOMMAND | MF_CHECKED);
+
+		// Remove Always on Top flag
+		SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+		MessageBoxW(hWnd, L"Settings have been reset to default values.", L"QuickChat", MB_OK | MB_ICONINFORMATION);
+	}
+}
+
+// ----- System Helpers -----
+void GetLocalComputerName() {
+	DWORD size = sizeof(computer_name) / sizeof(wchar_t);
+	GetComputerNameW(computer_name, &size);
 }
 
 // ======= 7. Network Core =======
@@ -614,12 +721,17 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 				continue;
 			}
 
-			// Waiting for specific handshake
+			// Waiting for handshake
 			XorObf((unsigned char*)hs, recv_len);
 			hs[recv_len] = '\0';
 
 			if (strncmp(hs, QC_LABEL, strlen(QC_LABEL)) != 0) {
 				LogMessage(L"[SECURITY]: Invalid handshake. Connection closed.");
+
+				if (!xor_enabled) {
+					send(temp_client, "QCERR: Invalid handshake", 24, 0);
+				}
+
 				closesocket(temp_client);
 				continue;
 			}
@@ -643,7 +755,7 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 
 		closesocket(server_fd);
 
-		// Send handshake reply (with Unicode-to-ANSI conversion).
+		// Send handshake reply.
 		char hs_reply[256];
 		int pos = snprintf(hs_reply, sizeof(hs_reply), "%s", QC_LABEL);
 		WideCharToMultiByte(CP_UTF8, 0, computer_name, -1, hs_reply + pos, sizeof(hs_reply) - pos, NULL, NULL);
@@ -674,10 +786,9 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 			return false;
 		}
 
-		struct timeval timeout = {
-			.tv_sec = 5,
-			.tv_usec = 0
-		};
+		struct timeval timeout;
+		timeout.tv_sec = 5;
+		timeout.tv_usec = 0;
 		setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
 
 		int active_port = xor_enabled ? PORT_QCS : PORT_QC;
@@ -719,7 +830,6 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 		WSAAddressToStringW((LPSOCKADDR)&server_info, sizeof(server_info), NULL, ip_w, &ip_len);
 		wcscpy(peer_ip, ip_w);
 
-		// Send handshake (Unicode -> UTF-8).
 		char hs[256];
 		int pos = snprintf(hs, sizeof(hs), "%s", QC_LABEL);
 		WideCharToMultiByte(CP_UTF8, 0, computer_name, -1, hs + pos, sizeof(hs) - pos, NULL, NULL);
@@ -801,7 +911,7 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 
 		if (bytes == SOCKET_ERROR) {
 			int err_code = WSAGetLastError();
-			if (err_code == WSAETIMEDOUT) continue; // Timeout is not an error in this case
+			if (err_code == WSAETIMEDOUT) continue;
 
 			wchar_t connlost_err[512];
 			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. (Error: %d)", err_code);
@@ -826,7 +936,6 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 		XorObf((unsigned char*)buffer, bytes);
 		buffer[bytes] = '\0';
 
-		// Custom ping
 		if (strcmp(buffer, "QCPING") == 0) {
 			char pong_msg[] = "QCPONG";
 			int len = strlen(pong_msg);
@@ -852,11 +961,10 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 			PlayNotifySound(SOUND_MSG);
 		}
 
-		// Convert received buffer to Unicode for display.
-		wchar_t wbuffer[BUFFER_SIZE];
-		MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wbuffer, BUFFER_SIZE);
-		AddMessage(wbuffer);
-		if (is_server) LogMessage(wbuffer);
+		wchar_t wide_buffer[BUFFER_SIZE];
+		MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wide_buffer, BUFFER_SIZE);
+		AddMessage(wide_buffer);
+		if (is_server) LogMessage(wide_buffer);
 	}
 
 	_endthread();
@@ -864,7 +972,6 @@ unsigned int __stdcall ReceiveMessages(void* arg) {
 }
 
 void SendCurrentMessage(HWND hWnd) {
-	// Counting characters including formatting.
 	int msglen = GetWindowTextLengthW(hEdit);
 	int maxallowed = (BUFFER_SIZE - 1) - wcslen(computer_name) - 8;
 	if (msglen > maxallowed) {
@@ -896,8 +1003,6 @@ void SendCurrentMessage(HWND hWnd) {
 	if (len > 0) {
 		wchar_t full_msg[BUFFER_SIZE + 128];
 		swprintf(full_msg, BUFFER_SIZE + 128, L"[%ls]: %ls", computer_name, start);
-
-		// Convert to UTF-8 for transmission.
 		char utf8_buffer[BUFFER_SIZE + 128];
 		WideCharToMultiByte(CP_UTF8, 0, full_msg, -1, utf8_buffer, sizeof(utf8_buffer), NULL, NULL);
 		int msg_len = strlen(utf8_buffer);
@@ -1065,9 +1170,7 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
 		case WM_CREATE: {
-			// Calculating DPI for UI fonts.
-			// Note that controls are not scalable items.
-			// Scaling controls to display DPI is quite hard.
+			// DPI calculation
 			HDC hdc = GetDC(hWnd);
 			int dpi = GetDeviceCaps(hdc, LOGPIXELSY); // 96 DPI
 			int font8pt = -MulDiv(8, dpi, 72); // 8pt
@@ -1106,6 +1209,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			SendMessageW(hMsgDisplay, WM_SETFONT, (WPARAM)hFontMono, TRUE);
 			SendMessageW(hEdit, WM_SETFONT, (WPARAM)hFontMono, TRUE);
 			SendMessageW(hSendBtn, WM_SETFONT, (WPARAM)hFontBold, TRUE);
+			SetWindowPos(hWnd, always_on_top ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
 			// Zero out error code to do not trigger false event.
 			SetLastError(0);
@@ -1161,7 +1265,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				CheckMenuItem(GetMenu(hWnd), ID_FLASH_TOGGLE, MF_BYCOMMAND | (flash_enabled ? MF_CHECKED : MF_UNCHECKED));
 				return 0;
 			} else if (LOWORD(wParam) == IDM_COMPUTER_INFO) {
-				// Using existing variables to display data.
 				const wchar_t* connected = is_running ? L"Yes" : L"No";
 				const wchar_t* displayName = (peer_name[0] != L'\0') ? peer_name : L"N/A";
 				const wchar_t* protocolLabel = xor_enabled ? L"QCS" : L"QC";
@@ -1172,7 +1275,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				const wchar_t* ip = is_server ? peer_ip : server_ip;
 
 				wchar_t info_msg[512];
-				swprintf(info_msg, 512,
+				swprintf(info_msg, sizeof(info_msg) / sizeof(wchar_t),
 					L"Remote Name: %ls\n"
 					L"Remote IP: %ls\n"
 					L"Protocol: %ls\n"
@@ -1204,36 +1307,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				send(client_socket, ping_msg, len, 0);
 				return 0;
 			} else if (LOWORD(wParam) == IDM_SAVE) {
-				wchar_t filename[MAX_PATH];
-				time_t now = time(NULL);
-				struct tm *tm_info = localtime(&now);
-				wcsftime(filename, MAX_PATH, L"Chat-%Y%m%d-%H%M%S.txt", tm_info);
-
-				int len = GetWindowTextLengthW(hMsgDisplay);
-				wchar_t *chatText = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
-				GetWindowTextW(hMsgDisplay, chatText, len + 1);
-
-				FILE *f = _wfopen(filename, L"wb");
-				if (f) {
-					// Use only for UTF-8 with BOM.
-					// fwrite("\xEF\xBB\xBF", 1, 3, f);
-
-					char *utf8 = (char*)malloc(len * 3 + 1);
-					WideCharToMultiByte(CP_UTF8, 0, chatText, -1, utf8, len * 3 + 1, NULL, NULL);
-					fwrite(utf8, 1, strlen(utf8), f);
-					free(utf8);
-					fclose(f);
-
-					wchar_t save_msg[512];
-					swprintf(save_msg, 512, L"Chat saved to %ls", filename);
-					MessageBoxW(hWnd, save_msg, L"QuickChat", MB_OK | MB_ICONINFORMATION);
-				} else {
-					wchar_t save_err[512];
-					swprintf(save_err, 512, L"Failed to save chat history. Error: %d.", GetLastError());
-					MessageBoxW(hWnd, save_err, L"QuickChat", MB_OK | MB_ICONERROR);
-				}
-
-				free(chatText);
+				SaveChatToFile(hWnd);
+				return 0;
+			} else if (LOWORD(wParam) == IDM_RESET_SETTINGS) {
+				ResetSettings(hWnd);
+				return 0;
 			}
 			return 0;
 		}
@@ -1249,7 +1327,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		}
 
 		case WM_DESTROY: {
-			// Prevent GDI leaks
 			if (oldEditProc) {
 				SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)oldEditProc);
 			}
@@ -1317,6 +1394,8 @@ void CreateMenuBar(HWND hWnd) {
 	HMENU hOpts = CreatePopupMenu();
 	AppendMenuW(hOpts, MF_STRING | MF_UNCHECKED, ID_FLASH_TOGGLE, L"Window Flash");
 	AppendMenuW(hOpts, MF_STRING | MF_UNCHECKED, ID_SOUND_TOGGLE, L"Sound");
+	AppendMenuW(hOpts, MF_SEPARATOR, 0, NULL);
+	AppendMenuW(hOpts, MF_STRING, IDM_RESET_SETTINGS, L"Reset Settings");
 	AppendMenuW(hMenu, MF_POPUP, (UINT_PTR)hOpts, L"Options");
 
 	HMENU hHelp = CreatePopupMenu();
@@ -1334,18 +1413,11 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	if (uMsg == WM_GETDLGCODE) {
 		return DLGC_WANTALLKEYS | CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
 	} else if (uMsg == WM_KEYDOWN) {
-		// Set our own handlers
-
-		// Ctrl+A
-		// Microsoft never made it Select all out-of-box, so developers
-		// have choice what they would do with this combination.
 		if (wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
 			SendMessageW(hWnd, EM_SETSEL, 0, -1);
 			return 0;
 		}
 
-		// Enter
-		// By default it inserts a new line, behavior since Windows 3.x.
 		if (wParam == VK_RETURN) {
 			if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
 				return CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
@@ -1355,11 +1427,8 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 			}
 		}
 
-		// Ctrl+W
-		// Close connection. Host only.
 		if (wParam == 'W' && (GetKeyState(VK_CONTROL) & 0x8000)) {
 			if (!is_server) {
-				// Do not allow client to execute command.
 				AddMessage(L"[ERROR]: You do not have permission to execute this command.");
 				return 0;
 			}
@@ -1370,8 +1439,6 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 			return 0;
 		}
 
-		// Ctrl+Shift+Del
-		// Clear chat window.
 		if (wParam == VK_DELETE && (GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_SHIFT) & 0x8000)) {
 			PostMessage(GetParent(hWnd), WM_COMMAND, MAKEWPARAM(IDM_CLEAR_CHAT, 0), 0);
 			return 0;
@@ -1443,18 +1510,15 @@ static bool IsValidTextExtension(const wchar_t *path) {
 	ext_lower[15] = L'\0';
 	for (int i = 0; ext_lower[i]; i++) ext_lower[i] = towlower(ext_lower[i]);
 
-	// Main
 	if (wcscmp(ext_lower, L".txt") == 0 ||
 		wcscmp(ext_lower, L".log") == 0 ||
 		wcscmp(ext_lower, L".md") == 0) return true;
 
-	// Code
 	if (wcscmp(ext_lower, L".c") == 0 ||
 		wcscmp(ext_lower, L".cpp") == 0 ||
 		wcscmp(ext_lower, L".h") == 0 ||
 		wcscmp(ext_lower, L".hpp") == 0) return true;
 
-	// Scripts
 	if (wcscmp(ext_lower, L".py") == 0 ||
 		wcscmp(ext_lower, L".js") == 0 ||
 		wcscmp(ext_lower, L".sh") == 0 ||
@@ -1462,7 +1526,6 @@ static bool IsValidTextExtension(const wchar_t *path) {
 		wcscmp(ext_lower, L".cmd") == 0 ||
 		wcscmp(ext_lower, L".ps1") == 0) return true;
 
-	// Configs
 	if (wcscmp(ext_lower, L".json") == 0 ||
 		wcscmp(ext_lower, L".xml") == 0 ||
 		wcscmp(ext_lower, L".yaml") == 0 ||
@@ -1472,7 +1535,6 @@ static bool IsValidTextExtension(const wchar_t *path) {
 		wcscmp(ext_lower, L".cfg") == 0 ||
 		wcscmp(ext_lower, L".conf") == 0) return true;
 
-	// Web
 	if (wcscmp(ext_lower, L".css") == 0 ||
 		wcscmp(ext_lower, L".html") == 0 ||
 		wcscmp(ext_lower, L".htm") == 0) return true;
@@ -1522,7 +1584,7 @@ static wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	ansi[read] = '\0';
 	CloseHandle(hFile);
 
-	// Skip BOM
+	// Skip UTF-8 BOM
 	int bom_offset = 0;
 	if (read >= 3 && (unsigned char)ansi[0] == 0xEF &&
 		(unsigned char)ansi[1] == 0xBB && (unsigned char)ansi[2] == 0xBF) {

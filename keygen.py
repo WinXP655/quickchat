@@ -17,7 +17,7 @@ def write_key_file(filename="key.h", key=None):
         f.write("#define KEY_H\n\n")
         f.write("#define KEY_LEN {}\n".format(len(key)))
         f.write("\n")
-        f.write("static const unsigned char key[{}] = {{\n    ".format(len(key)))
+        f.write("static const unsigned char key[{}] = {{\n ".format(len(key)))
         f.write(", ".join(f"0x{b:02x}" for b in key))
         f.write("\n};\n\n")
         f.write("#endif // KEY_H\n")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         except ValueError:
             print("Invalid length, using default 32.")
 
-    print(f"Generating XOR key (length: {length})...")
+    print(f"Key length: {length}")
     key = generate_key(length)
     write_key_file("key.h", key)
 

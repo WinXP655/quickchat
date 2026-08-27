@@ -10,7 +10,6 @@ Based on MicroChat Framework (https://github.com/WinXP655/microchat).
 Active development is now focuses on maintenance, bug fixes and security patches.
 No major features are planned.
 
-
 - Features
 1. Portable - just 1 .exe file
 2. Unicode Support - any languages, any symbols.
@@ -40,7 +39,6 @@ Client:
   3. Type the Hosy IP and click Connect.
   4. Select protocol.
 
-
 - Logging
 Full chat log stored only on host side and do not contain sensitive information.
 It only logs:
@@ -54,48 +52,24 @@ For client, added option to save just chat history:
  - Connection
  - Save Chat
 
-
-Protocol
-
-It uses a very simple yet working custom protocol QuickChat/QuickChat Secure (QC/QCS):
-
-  1. Who starts first: Client. Host never sends anything until it will be QC handshake.
-  2. Client sends handshake in following format: QC:PCNAME\0.
-     Replace PCNAME with your computer name or what you want remote side to see.
-     "\0" is required - official backend written on C, meaning you have to follow C rules.
-     If you are using QCS, you need to XOR everything before.
-     First 3 bytes should be exactly "QC:" or XORed version of it. Host reject if
-     it is non-QC or at least 1 byte is wrong.
-  3. Host send its name in same format.
-  4. Chat starts.
-
-It also supports custom ping:
-  1. Send "QCPING" or its XORed version to remote side.
-  2. If you receive "QCPONG" or its XORed version, then remote side is active.
-  3. Note that both sides should know both commands.
-
-Host/client side can delete logs/history at any time, it is stored only locally.
-
-
 - Changelog
 Read CHANGELOG.md in the official repository.
 
 - Quirks
-- Adding error code to log write fail breaks theming.
+* Adding error code to log write fail breaks theming.
   Adding showing error code in logging start failure breaks Common Controls v6
   (disabling theming).
   Fixed: Yes
 
-- Client and Server show same IP address, when no route but computers connected anyways.
+* Client and Server show same IP address, when no route but computers connected anyways.
   Sometimes IP address displayed incorrectly when routing table is wrong.
   Fix: Reset routing table completely.
 
-- Tab inserted as a character instead switching controls.
+* Tab inserted as a character instead switching controls.
   This is a known limitation of multi-line EDIT control, no known fix exist except
   subclassing, but it will be handled only for specific control. Default behavior
   since Windows 3.x.
   Fix: Not available.
-
 
 - How to activate high-DPI fonts
 By default, manifest provide only Common Controls v6.
