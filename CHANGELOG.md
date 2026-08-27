@@ -1,6 +1,23 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 18 August 2026)**:
+**QuickChat (Current, 27 August 2026)**:
+- Grouped helper functions into categories.
+- Moved large functions from WndMain to separate categories.
+- Added error response to QC (plain text) protocol.
+- Added "Reset Settings" option.
+- Made some code a bit ungrouped (structure "timeout").
+- Added custom exception handler.
+- Renamed some variables to readable names (mostly settings related).
+- Removed not needed comments.
+- Shortened some extra comments.
+- Added "void" arg to functions which do not accept args.
+- Removed unused IsWindow call from AddMessage.
+- Added user key generator - keygen_fixed.py.
+- Fixed Always on Top setting entry was ignored when loading settings.
+- Grouped function prototypes into categories.
+- Relaced some fixed values with "sizeof(buffer) / sizeof(wchar_t)".
+
+**QuickChat (18 August 2026)**:
 - Added key combinations using different method.\
   Ctrl+Shift+Delete - Close Connection\
   Ctrl+L - Clear Chat\
