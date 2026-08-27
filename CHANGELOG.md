@@ -16,6 +16,7 @@
 - Fixed Always on Top setting entry was ignored when loading settings.
 - Grouped function prototypes into categories.
 - Relaced some fixed values with "sizeof(buffer) / sizeof(wchar_t)".
+Note: this may be last update before setting project state to frozen. Who knows when it will happen? ¯\_(ツ)_/¯
 
 **QuickChat (18 August 2026)**:
 - Added key combinations using different method.\
