@@ -14,8 +14,8 @@ No major features are planned.
 1. **Portable** - just 1 .exe file
 2. **Unicode Support** - any languages, any symbols.
 3. **QC/QCS Protocol**
-  - QC (QuickChat) - plaintext.
-  - QCS (QuickChat Obfuscated) - XOR obfuscation.
+  - QC (QuickChat) - plaintext, base protocol.
+  - QCS (QuickChat Obfuscated) - XOR obfuscation, virtual protocol on top of QC.
 4. **Logging** - save chat history and events. Only for Server, disabled by default.
 5. **Tiny Size** - just 150 KB.
 6. **Drag-and-Drop** - drag-and-drop any compatible text file and it will extract text instantly.
@@ -52,7 +52,8 @@ For client, added option to save just chat history:
 2. Save Chat
 
 ## Protocol
-It uses a very simple yet working custom protocol QuickChat/QuickChat Onfuscated (QC/QCS):
+It uses a very simple yet working custom protocol. The base protocol is QuickChat Plaintext (QC).\
+QCS (QuickChat Obfuscated) is not a separate protocol - it is a XOR overlay that masks the data.
 1. Who starts first: Client. Host never sends anything until it will be QC handshake.
 2. Client sends handshake in following format: QC:PCNAME\0.
    Replace PCNAME with your computer name or what you want remote side to see.\
@@ -62,11 +63,8 @@ It uses a very simple yet working custom protocol QuickChat/QuickChat Onfuscated
 3. Host send its name in same format.
 4. Chat starts.
 
-It also supports custom ping:
-1. Send "QCPING" or its XORed version to remote side.
-2. If you receive "QCPONG" or its XORed version, then remote side is active
-3. Note that both sides should know both commands.
-*Host and client side can delete logs/history at any time, it is stored only locally*.
+> Host and client side can delete logs/history at any time, it is stored only locally.\
+> **Note:** QCS is a virtual protocol. It does not exist without QC Plaintext. When QCS is enabled, all data is XORed before being sent, and no plaintext data leaves the application.
 
 ## Changelog
 Read CHANGELOG.md.
