@@ -1,6 +1,22 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 27 August 2026)**:
+**QuickChat (Current, 5 September 2026)**:
+- Removed Close Connection.
+- Removed ping.
+- Changed order of initial initialization: Exception Filter, Local Computer Name, Settings, Visual Styles.
+- Removed commented out code for UTF-8 BOM marker in saved chat file.
+- Removed comments from Reset Settings function (they are redunant in this case).
+- Made QC (plain text) protocol error message more generic "QCERR: Malformed packet" instead "QCERR: Invalid handshake".
+- Moved logging leave message before send in disconnect function.
+- Added optimization flags: -Os -ffunction-sections -fdata-sections.
+- Moved chat log filename to #define (static data).
+- Removed more unneeded comments.
+- Enlarge dbuffer size for loading settings from 128 bytes (64 chars) to 512 bytes (256 chars) for 1 line.
+- Renamed crash.txt to crashlog.txt for single style with chatlog.txt.
+- Replaced _wfopen with CreateFileW.
+- Added check for 0.0.0.0 and 127.0.0.1.
+
+**QuickChat (27 August 2026)**:
 - Grouped helper functions into categories.
 - Moved large functions from WndMain to separate categories.
 - Added error response to QC (plain text) protocol.
