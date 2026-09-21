@@ -1,0 +1,14 @@
+#include <windows.h>
+
+2 DIALOG 0, 0, 175, 82
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "QuickChat"
+FONT 8, "Tahoma"
+{
+    LTEXT "Choose your role:", -1, 8, 5, 160, 8
+    PUSHBUTTON "&Host", 101, 8, 15, 75, 14
+    PUSHBUTTON "&Join", 102, 92, 15, 75, 14
+    CONTROL "&Enable XOR obfuscation", 201, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 33, 160, 11
+    CONTROL "&Enable logging (host-only)", 202, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 46, 160, 11
+    DEFPUSHBUTTON "E&xit", 103, 63, 62, 50, 14
+}

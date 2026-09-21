@@ -1,0 +1,13 @@
+#include <windows.h>
+
+3 DIALOG 0, 0, 179, 63
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About QuickChat"
+FONT 8, "Tahoma"
+{
+    ICON "ICON", -1, 8, 6, 21, 20
+    LTEXT "QuickChat", 301, 35, 6, 140, 8
+    LTEXT "A minimalistic LAN messenger using Win32.", -1, 35, 19, 140, 8
+    LTEXT "(c) 2026 WinXP655", -1, 35, 32, 140, 8
+    DEFPUSHBUTTON "OK", IDOK, 65, 44, 50, 14
+}

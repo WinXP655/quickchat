@@ -1,13 +1,13 @@
 #include <windows.h>
 
-1 DIALOG 0, 0, 180, 75
+1 DIALOG 0, 0, 175, 67
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "QuickChat"
 FONT 8, "Tahoma"
 {
-    LTEXT "Enter host IP address:", -1, 11, 6, 160, 9
-    EDITTEXT 1001, 12, 21, 160, 14, ES_AUTOHSCROLL
-    LTEXT "Example: 192.168.1.100 or 127.0.0.1", -1, 12, 41, 153, 10
-    DEFPUSHBUTTON "Connect", IDOK, 67, 55, 49, 14
-    PUSHBUTTON "Cancel", IDCANCEL, 121, 55, 49, 14
+    LTEXT "Enter host IP address:", -1, 11, 6, 155, 8
+    EDITTEXT 1001, 11, 18, 155, 12, ES_AUTOHSCROLL
+    LTEXT "Example: 192.168.1.100 or 127.0.0.1", -1, 11, 35, 155, 8
+    DEFPUSHBUTTON "Connect", IDOK, 35, 48, 50, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 91, 48, 50, 14
 }

@@ -13,9 +13,7 @@ No major features are planned.
 - Features
 1. Portable - just 1 .exe file
 2. Unicode Support - any languages, any symbols.
-3. QC/QCS Protocol
-   - QC (QuickChat) - plaintext.
-   - QCS (QuickChat Obfuscated) - XOR obfuscation.
+3. QC (QuickChat) protocol with optional XOR.
 4. Logging - save chat history and events. Only for Server, disabled by default.
 5. Tiny Size - just 142 KB.
 6. Extracting text from text files by just drag-and-drop.
@@ -27,17 +25,15 @@ OS - Windows 2000 and newer.
 
 Host:
   1. Run QuickChat.
-  2. Click Yes.
-  3. Select protocol.
-  4. Select if you want to enable logs.
-  5. Share displayed IP.
-     Note that user should be in same network.
+  2. In the startup dialog, click Host.
+  3. Configure options: check XOR Obfuscation and/or Enable Logging if needed.
+  4. Share the displayed IP address with peers (must be on the same network).
 
 Client:
   1. Run QuickChat.
-  2. Click No.
-  3. Type the Hosy IP and click Connect.
-  4. Select protocol.
+  2. In the startup dialog, click Join.
+  3. Enter the Host IP address in the connection window and click Connect.
+  4. Verify protocol settings (XOR must match the host's configuration).
 
 - Logging
 Full chat log stored only on host side and do not contain sensitive information.
@@ -55,74 +51,6 @@ For client, added option to save just chat history:
 - Changelog
 Read CHANGELOG.md in the official repository.
 
-- Quirks
-* Adding error code to log write fail breaks theming.
-  Adding showing error code in logging start failure breaks Common Controls v6
-  (disabling theming).
-  Fixed: Yes
-
-* Client and Server show same IP address, when no route but computers connected anyways.
-  Sometimes IP address displayed incorrectly when routing table is wrong.
-  Fix: Reset routing table completely.
-
-* Tab inserted as a character instead switching controls.
-  This is a known limitation of multi-line EDIT control, no known fix exist except
-  subclassing, but it will be handled only for specific control. Default behavior
-  since Windows 3.x.
-  Fix: Not available.
-
-- How to activate high-DPI fonts
-By default, manifest provide only Common Controls v6.
-DPI-aware manifest wasn't added because Windows XP compatibility breaks with SxS error.
-
-Steps to activate high DPI (Windows 10/11):
-  1. Open quickchat.exe properties.
-  2. Select "Compatibility" tab.
-  3. Click "Change high DPI settings".
-  4. Check "Override high DPI scaling behavior" and select "Application" from list.
-  5. Click OK and then Apply.
-
-Steps to activate high DPI (Windows 7/8):
-  1. Open quickchat.exe properties.
-  2. Select "Compatibility" tab.
-  3. Check "Disable display scaling on high DPI settings".
-  4. Click Apply.
-
-Note that only fonts are scaled - controls are fixed in size.
-
 ---
 
 Enjoy! If you have questions, write me to my Discord - @pcsettings
-
----
-
-Error codes for extra info.
-
-Winsock errors:
-10060|Connection timed out (Server unreachable).
-10061|Connection refused (Server not running or blocked by firewall).
-10054|Connection reset by peer.
-10053|Connection aborted.
-10065|Host unreachable.
-10051|Network unreachable.
-10048|Port already in use.
-10057|Socket is not connected.
-10058|Cannot send after socket shutdown.
-10035|Connection busy (Try again later).
-
-System errors (Windows):
-2|File not found.
-3|Path not found.
-4|Too many open files.
-5|Access denied.
-6|Invalid handle.
-8|Not enough memory.
-32|Sharing violation (file locked by another process).
-33|Process lock violation.
-87|Invalid parameter.
-130|Sharing buffer exceeded.
-183|Cannot create file (already exists).
-206|Filename too long.
-267|Directory name invalid.
-123|Invalid name in path.
-1392|Disk or file system corrupted.
