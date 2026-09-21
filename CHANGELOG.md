@@ -1,14 +1,14 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 21 September 2026)**:
+**QuickChat (Current, 21 September 2026)**:\
 WARNING: Windows 2000/XP is no longer supported by newer versions.
 Minimal version is Windows Vista.
 
 - Removed unused code.
 - Replaced FILE* with HANDLE for chat log handle.
-- Added and updated QC (plaintext) error messages:
-  QCERR: No data
-  QCERR: Packet is too large
+- Added and updated QC (plaintext) error messages:\
+  QCERR: No data\
+  QCERR: Packet is too large\
   QCERR: Invalid handshake
 - Removed QC protocol warning.
 - Removed unneeded comments.
