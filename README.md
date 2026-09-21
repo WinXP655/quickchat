@@ -2,9 +2,9 @@
 QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
 Does not require installation, leaves no traces, and works on any version starting from Windows 2000 up to 11.
 
-<img width="586" height="388" alt="image" src="https://github.com/user-attachments/assets/5fae96ec-dd38-4159-b84c-e47dc066941e" />
+<img width="586" height="388" alt="image" src="https://github.com/user-attachments/assets/ce0089cd-bc3b-4a9b-8f83-8d4a2015994b" />
 
-Based on [MicroChat Framework](https://github.com/WinXP655/microchat).
+*Based on [MicroChat Framework](https://github.com/WinXP655/microchat).*
 
 ## Project Status
 Active development is now focuses on maintenance, bug fixes and security patches.\
@@ -13,31 +13,27 @@ No major features are planned.
 ## Features
 1. **Portable** - just 1 .exe file
 2. **Unicode Support** - any languages, any symbols.
-3. **QC/QCS Protocol**
-  - QC (QuickChat) - plaintext, base protocol.
-  - QCS (QuickChat Obfuscated) - XOR obfuscation, virtual protocol on top of QC.
+3. **QC (QuickChat)** protocol with optional XOR.
 4. **Logging** - save chat history and events. Only for Server, disabled by default.
 5. **Tiny Size** - just 150 KB.
 6. **Drag-and-Drop** - drag-and-drop any compatible text file and it will extract text instantly.
 
 ## Requirements
-- **OS** - Windows 2000 and newer.
+- **OS** - Windows Vista and newer.
 
 ## How to use
 
 ### 1. Host
 1. Run QuickChat.
-2. Click Yes.
-3. Select protocol.
-4. Select if you want to enable logs.
-5. Share displayed IP.
-   Note that user should be in same network.
+2. In the startup dialog, click Host.
+3. Configure options: check XOR Obfuscation and/or Enable Logging if needed.
+4. Share the displayed IP address with peers (must be on the same network).
 
 ### 2. Client
 1. Run QuickChat.
-2. Click No.
-3. Type the Host IP and click Connect.
-4. Select protocol.
+2. In the startup dialog, click Join.
+3. Enter the Host IP address in the connection window and click Connect.
+4. Verify protocol settings (XOR must match the host's configuration).
 
 ## Logging
 Full chat log stored only on host side and do not contain sensitive information. It only logs:
@@ -52,19 +48,23 @@ For client, added option to save just chat history:
 2. Save Chat
 
 ## Protocol
-It uses a very simple yet working custom protocol. The base protocol is QuickChat Plaintext (QC).\
-QCS (QuickChat Obfuscated) is not a separate protocol - it is a XOR overlay that masks the data.
+It uses a very simple custom protocol. The base protocol is QuickChat Plaintext (QC).\
 1. Who starts first: Client. Host never sends anything until it will be QC handshake.
 2. Client sends handshake in following format: QC:PCNAME\0.
    Replace PCNAME with your computer name or what you want remote side to see.\
    "\0" is required - official backend written on C, meaning you have to follow C rules.\
-   If you are using QCS, you need to XOR everything before.\
-   First 3 bytes should be exactly "QC:" or XORed version of it. Host reject if it is non-QC or at least 1 byte is wrong.\
+   If you are using XOR, you need to XOR everything before.\
+   First 3 bytes should be exactly "QC:" or XORed version of it. Host reject if it is non-QC or at least 1 byte is wrong.
 3. Host send its name in same format.
 4. Chat starts.
 
-> Host and client side can delete logs/history at any time, it is stored only locally.\
-> **Note:** QCS is a virtual protocol. It does not exist without QC Plaintext. When QCS is enabled, all data is XORed before being sent, and no plaintext data leaves the application.
+> Host and client side can delete logs/history at any time, it is stored only locally.
+
+## Use сases
+- **Quick 1-to-1 chat in a local network**: No server, no accounts, no setup.\
+- **Private chat**: Optional XOR layer hides traffic from casual inspectors.\
+- **Portable chat**: Single .exe file, no registry, no install, no traces.\
+- **One-time sessions with no traces**: Logs off by default. Close the app and nothing remains.
 
 ## Changelog
 Read CHANGELOG.md.
@@ -81,8 +81,6 @@ Read CHANGELOG.md.
 - keygen.py - XOR key generator.
 - keygen_fixed.py - XOR key generator, but with your own key.
 - build.bat - build script.
-- resource.rc - resources.
-- quickchat.manifest - Common Controls v6 manifest. Mostly for visual styles.
 
 ### Steps
 1. Clone or download a repository
@@ -97,42 +95,8 @@ Read CHANGELOG.md.
    `build.bat /pack` - Compile QuickChat and pack without regenerating key.\
    `build.bat /rekey /pack` - Compile QuickChat, regenerate key and pack.\
    `build.bat /minbuild` - Compile QuickChat with most minimal configuration.\
-   `build.bat /clean` - Delete existing compiled files.
-
-## Quirks
-- Adding error code to log write fail breaks themeing.\
-Adding showing error code in logging start failure breaks Common Controls v6 (disabling themeing).\
-Fixed: Yes.
-
-- Client and Server show same IP address, when no route but computers connected anyways.\
-Sometimes IP address displayed incorrectly when routing table is wrong.\
-Fix: Reset routing table completely.
-
-- Tab inserted as a character instead switching controls.\
-This is a known limitation of multi-line EDIT control, no known fix exist except subclassing, but it will be handled only for specific control. Default behavior since Windows 3.x.\
-Fix: Not available.
-
-## How to activate high-DPI fonts
-By default, manifest provide only Common Controls v6.
-DPI-aware manifest wasn't added because Windows XP compatibility breaks with SxS error.
-
-Steps to activate high DPI (Windows 10/11):
-1. Open `quickchat.exe` properties.
-2. Select "Compatiblity" tab.
-3. Click "Change high DPI settings".
-4. Check "Override high DPI scaling behavior" and select "Application" from list.
-5. Click OK and then Apply.
-
-Steps to activate high DPI (Windows 7/8):
-1. Open `quickchat.exe` properties.
-2. Select "Compatiblity" tab.
-3. Check "Disable display scaling on high DPI settings".
-4. Click Apply.
-
-Note that only fonts are scaled - controls are fixed in size
-
-<img width="584" height="387" alt="image" src="https://github.com/user-attachments/assets/2acadc53-e092-416e-98aa-5a82ce0661b4" />\
-*QuickChat in 125% scaling on Windows 10*
+   `build.bat /clean` - Delete existing compiled files.\
+   `build.bat /clean /nocleankey` - Delete existing compiled files, but do not delete key file.
 
 ## Credits
 This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
