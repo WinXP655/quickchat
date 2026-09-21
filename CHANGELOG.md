@@ -1,6 +1,50 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 5 September 2026)**:
+**QuickChat (Current, 21 September 2026)**:
+WARNING: Windows 2000/XP is no longer supported by newer versions.
+Minimal version is Windows Vista.
+
+- Removed unused code.
+- Replaced FILE* with HANDLE for chat log handle.
+- Added and updated QC (plaintext) error messages:
+  QCERR: No data
+  QCERR: Packet is too large
+  QCERR: Invalid handshake
+- Removed QC protocol warning.
+- Removed unneeded comments.
+- Enhanced handshake memory safety - size check, replaced invalid handshake message with generic.
+- Remove protocol from title.
+- Fixed 0xC0000005 on host exit.
+- Fixed logging and writing settings.
+- Moved log initialization to separate function.
+- Moved settings file parser to separate function.
+- Replaced C functions with WinAPI functions.
+- Replaced core dialogs with modern: Initial/Mode, About, Computer Info, Host IP Dialog. 
+- Replaced QCS with XOR.
+- Optimized build script.
+- Changed minimal version to Windows Vista (6.0).
+- Removed host IP check for 0.0.0.0, 127.0.0.1.
+- Removed WinSock, file system error codes, Quirks, High DPI from readme.txt.
+- Added DPI awareness to manifest.
+- Unified all fonts to Tahoma.
+- Added leave chat confimation toggle (now it can be disabled).
+- Replaced full disable of message edit to setting read-only.
+- Removed Clear Chat hotkey and added confirmation (better safety).
+- Replaced all malloc with ExitProcess(1).
+- Moved to separate function and optimized font creation.
+- Moved controls creation to separate function.
+- Moved window resizing to separate function.
+- Moved Send command and menu commands handler to separate function.
+- Removed error messages from GetDefaultIP.
+- Changed XOR key.
+
+Developer note:
+This update is even harder than previous, but message boxes do not allow such customization like custom buttons.
+When needed custom button texts, message boxes are just trash - they do not allow this. And yes, this API is ancient :D
+RC files have major con - they can be removed and apps will break, but who cares? No one, because it's best way for custom dialogs.
+Also message boxes are largely obsolete even by Microsoft - they recommend or use RC, or TaskDialog API (but that's Vista and higher stuff).
+
+**QuickChat (5 September 2026)**:
 - Removed Close Connection.
 - Removed ping.
 - Changed order of initial initialization: Exception Filter, Local Computer Name, Settings, Visual Styles.
@@ -32,7 +76,7 @@
 - Fixed Always on Top setting entry was ignored when loading settings.
 - Grouped function prototypes into categories.
 - Relaced some fixed values with "sizeof(buffer) / sizeof(wchar_t)".\
-Note: this may be last update before setting project state to frozen. Who knows when it will happen? ¯\\_(ツ)_/¯
+This may be last update before setting project state to frozen. Who knows when it will happen? ¯\\_(ツ)_/¯
 
 **QuickChat (18 August 2026)**:
 - Added key combinations using different method.\
