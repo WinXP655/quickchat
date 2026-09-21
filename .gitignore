@@ -1,8 +1,12 @@
 # Compiled files
 QuickChat.zip
 quickchat.exe
-resource.o
+resources.o
 servconn.o
+start.o
+about.o
+compinfo.o
+hostinfo.o
 
 # QCS Key
 key.h
