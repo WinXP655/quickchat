@@ -74,12 +74,14 @@ HANDLE chat_log = NULL;
 
 // ----- UI handles -----
 HWND hWndGlobal = NULL;
+HWND hHostInfoDlg = NULL;
 HWND hEdit = NULL;
 HWND hSendBtn = NULL;
 HWND hMsgDisplay = NULL;
 
 // ----- UI resources -----
 WNDPROC oldEditProc = NULL;
+WNDPROC oldDisplayProc = NULL;
 HFONT hFontBold = NULL;
 HFONT hFont = NULL;
 HINSTANCE hInstGlobal = NULL;
@@ -93,12 +95,10 @@ LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo);
 bool InitializeLog(HANDLE hLogFile);
 
 // ----- Helper Functions -----
-void GetLocalComputerName(void);
-void LoadSettings(void);
 void EnableVisualStyles(void);
 void PlayNotifySound(int sound);
-char* ReadIniValue(const char* buffer, const char* key, char* out_value, size_t out_size);
 bool IsValidTargetIP(const wchar_t* ip_str);
+void GetLocalComputerName(void);
 void ShowError(const wchar_t* msg, DWORD err);
 void CleanupAndExit(void);
 void AddMessage(const wchar_t* msg);
@@ -108,6 +108,8 @@ void LogMessage(const wchar_t* message);
 void DisableChatControls(BOOL disable);
 void SaveSettings(void);
 void CloseLog(void);
+void LoadSettings(void);
+char* ReadIniValue(const char* buffer, const char* key, char* out_value, size_t out_size);
 void Disconnect(void);
 void SaveChatToFile(HWND hWnd);
 void ResetSettings(HWND hWnd);
@@ -148,13 +150,14 @@ void InsertTextIntoEdit(const wchar_t *text);
 
 // ======== 5. Core Functions =======
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
+	volatile ULONGLONG uptime = GetTickCount64();
+	(void)uptime;
+
 	(void)hPrevInstance;
 	(void)lpCmdLine;
 	hInstGlobal = hInstance;
 
 	SetUnhandledExceptionFilter(CrashHandler);
-	GetLocalComputerName();
-	LoadSettings();
 	EnableVisualStyles();
 
 	INT_PTR mode_result = DialogBoxParamW(hInstance, MAKEINTRESOURCEW(2), NULL, ModeSelectProc, 0);
@@ -204,8 +207,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 	MSG msg;
 	while (GetMessageW(&msg, NULL, 0, 0)) {
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		if (!IsDialogMessageW(hWndGlobal, &msg)) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
 	}
 	return msg.wParam;
 }
@@ -274,159 +279,6 @@ bool InitializeLog(HANDLE hLogFile) {
 }
 
 // ======= 6. Helper Functions =======
-// ----- System -----
-void GetLocalComputerName(void) {
-	DWORD size = sizeof(computer_name) / sizeof(wchar_t);
-	GetComputerNameW(computer_name, &size);
-}
-
-void CleanupAndExit(void) {
-	SaveSettings();
-	is_running = 0;
-
-	if (client_socket != INVALID_SOCKET) {
-		shutdown(client_socket, SD_BOTH);
-		closesocket(client_socket);
-		client_socket = INVALID_SOCKET;
-	}
-
-	if (hReceiveThread != NULL) {
-		CloseHandle(hReceiveThread);
-		hReceiveThread = NULL;
-	}
-
-	CloseLog();
-
-	WSACleanup();
-	PostQuitMessage(0);
-}
-
-// ----- Settings -----
-void LoadSettings(void) {
-	HANDLE hSettingsFile = CreateFileW(INI_FILE, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-	if (hSettingsFile != INVALID_HANDLE_VALUE) {
-		char buffer[4096];
-		DWORD bytes_read;
-		if (ReadFile(hSettingsFile, buffer, sizeof(buffer) - 1, &bytes_read, NULL) && bytes_read > 0) {
-			buffer[bytes_read] = '\0';
-
-			char val[64];
-			if (ReadIniValue(buffer, "always_on_top", val, sizeof(val))) {
-				always_on_top = (val[0] == '1');
-			}
-			if (ReadIniValue(buffer, "flash", val, sizeof(val))) {
-				flash_enabled = (val[0] == '1');
-			}
-			if (ReadIniValue(buffer, "sound", val, sizeof(val))) {
-				sound_enabled = (val[0] == '1');
-			}
-			if (ReadIniValue(buffer, "leave_confirm", val, sizeof(val))) {
-				confirm_enabled = (val[0] == '1');
-			}
-		}
-		CloseHandle(hSettingsFile);
-	}
-}
-
-char* ReadIniValue(const char* buffer, const char* key, char* out_value, size_t out_size) {
-	if (!buffer || !key || !out_value || out_size == 0) return NULL;
-
-	const char* p = buffer;
-	size_t key_len = strlen(key);
-
-	while (*p) {
-		if (*p == '\r' || *p == '\n' || *p == ';' || *p == '#') {
-			while (*p && *p != '\n') p++;
-			if (*p == '\n') p++;
-			continue;
-		}
-
-		if (*p == '[') {
-			while (*p && *p != '\n') p++;
-			if (*p == '\n') p++;
-			continue;
-		}
-
-		const char* eq = strchr(p, '=');
-		if (!eq) {
-			while (*p && *p != '\n') p++;
-			if (*p == '\n') p++;
-			continue;
-		}
-
-		const char* key_start = p;
-		const char* key_end = eq - 1;
-		while (key_end > key_start && (*key_end == ' ' || *key_end == '\t')) key_end--;
-
-		size_t found_key_len = key_end - key_start + 1;
-		if (found_key_len == key_len && strncmp(key_start, key, key_len) == 0) {
-			const char* val_start = eq + 1;
-			while (*val_start == ' ' || *val_start == '\t') val_start++;
-
-			const char* val_end = val_start + strlen(val_start) - 1;
-			while (val_end > val_start && (*val_end == ' ' || *val_end == '\t' || *val_end == '\r' || *val_end == '\n')) {
-				val_end--;
-			}
-
-			size_t val_len = val_end - val_start + 1;
-			if (val_len >= out_size) val_len = out_size - 1;
-
-			memcpy(out_value, val_start, val_len);
-			out_value[val_len] = '\0';
-			return out_value;
-		}
-
-		p = eq + 1;
-		while (*p && *p != '\n') p++;
-		if (*p == '\n') p++;
-	}
-
-	return NULL;
-}
-
-void SaveSettings(void) {
-	HANDLE hSettingsFile = CreateFileW(INI_FILE, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-
-	if (hSettingsFile != INVALID_HANDLE_VALUE) {
-		char buffer[256];
-		int len = snprintf(buffer, sizeof(buffer),
-			"[QuickChat]\r\n"
-			"always_on_top=%d\r\n"
-			"flash=%d\r\n"
-			"sound=%d\r\n"
-			"leave_confirm=%d\r\n",
-			always_on_top ? 1 : 0,
-			flash_enabled ? 1 : 0,
-			sound_enabled ? 1 : 0,
-			confirm_enabled ? 1 : 0);
-
-		DWORD bytes_written;
-		WriteFile(hSettingsFile, buffer, len, &bytes_written, NULL);
-		CloseHandle(hSettingsFile);
-	}
-}
-
-void ResetSettings(HWND hWnd) {
-	int result = MessageBoxW(hWnd, L"Are you sure you want to reset all settings?", L"QuickChat", MB_YESNO | MB_ICONWARNING);
-
-	if (result == IDYES) {
-		DeleteFileW(INI_FILE);
-
-		always_on_top = false;
-		flash_enabled = true;
-		sound_enabled = true;
-
-		CheckMenuItem(GetMenu(hWnd), IDM_ALWAYS_ON_TOP, MF_BYCOMMAND | MF_UNCHECKED);
-		CheckMenuItem(GetMenu(hWnd), ID_FLASH_TOGGLE, MF_BYCOMMAND | MF_CHECKED);
-		CheckMenuItem(GetMenu(hWnd), ID_SOUND_TOGGLE, MF_BYCOMMAND | MF_CHECKED);
-
-		SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-
-		MessageBoxW(hWnd, L"Settings have been reset to default values.", L"QuickChat", MB_OK | MB_ICONINFORMATION);
-	}
-}
-
 // ----- User Interface -----
 void EnableVisualStyles(void) {
 	INITCOMMONCONTROLSEX icex;
@@ -584,6 +436,159 @@ void Disconnect(void) {
 	CleanupAndExit();
 }
 
+// ----- System -----
+void GetLocalComputerName(void) {
+	DWORD size = sizeof(computer_name) / sizeof(wchar_t);
+	GetComputerNameW(computer_name, &size);
+}
+
+void CleanupAndExit(void) {
+	SaveSettings();
+	is_running = 0;
+
+	if (client_socket != INVALID_SOCKET) {
+		shutdown(client_socket, SD_BOTH);
+		closesocket(client_socket);
+		client_socket = INVALID_SOCKET;
+	}
+
+	if (hReceiveThread != NULL) {
+		CloseHandle(hReceiveThread);
+		hReceiveThread = NULL;
+	}
+
+	CloseLog();
+
+	WSACleanup();
+	PostQuitMessage(0);
+}
+
+// ----- Settings -----
+void LoadSettings(void) {
+	HANDLE hSettingsFile = CreateFileW(INI_FILE, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (hSettingsFile != INVALID_HANDLE_VALUE) {
+		char buffer[4096];
+		DWORD bytes_read;
+		if (ReadFile(hSettingsFile, buffer, sizeof(buffer) - 1, &bytes_read, NULL) && bytes_read > 0) {
+			buffer[bytes_read] = '\0';
+
+			char val[64];
+			if (ReadIniValue(buffer, "always_on_top", val, sizeof(val))) {
+				always_on_top = (val[0] == '1');
+			}
+			if (ReadIniValue(buffer, "flash", val, sizeof(val))) {
+				flash_enabled = (val[0] == '1');
+			}
+			if (ReadIniValue(buffer, "sound", val, sizeof(val))) {
+				sound_enabled = (val[0] == '1');
+			}
+			if (ReadIniValue(buffer, "leave_confirm", val, sizeof(val))) {
+				confirm_enabled = (val[0] == '1');
+			}
+		}
+		CloseHandle(hSettingsFile);
+	}
+}
+
+char* ReadIniValue(const char* buffer, const char* key, char* out_value, size_t out_size) {
+	if (!buffer || !key || !out_value || out_size == 0) return NULL;
+
+	const char* p = buffer;
+	size_t key_len = strlen(key);
+
+	while (*p) {
+		if (*p == '\r' || *p == '\n' || *p == ';' || *p == '#') {
+			while (*p && *p != '\n') p++;
+			if (*p == '\n') p++;
+			continue;
+		}
+
+		if (*p == '[') {
+			while (*p && *p != '\n') p++;
+			if (*p == '\n') p++;
+			continue;
+		}
+
+		const char* eq = strchr(p, '=');
+		if (!eq) {
+			while (*p && *p != '\n') p++;
+			if (*p == '\n') p++;
+			continue;
+		}
+
+		const char* key_start = p;
+		const char* key_end = eq - 1;
+		while (key_end > key_start && (*key_end == ' ' || *key_end == '\t')) key_end--;
+
+		size_t found_key_len = key_end - key_start + 1;
+		if (found_key_len == key_len && strncmp(key_start, key, key_len) == 0) {
+			const char* val_start = eq + 1;
+			while (*val_start == ' ' || *val_start == '\t') val_start++;
+
+			const char* val_end = val_start + strlen(val_start) - 1;
+			while (val_end > val_start && (*val_end == ' ' || *val_end == '\t' || *val_end == '\r' || *val_end == '\n')) {
+				val_end--;
+			}
+
+			size_t val_len = val_end - val_start + 1;
+			if (val_len >= out_size) val_len = out_size - 1;
+
+			memcpy(out_value, val_start, val_len);
+			out_value[val_len] = '\0';
+			return out_value;
+		}
+
+		p = eq + 1;
+		while (*p && *p != '\n') p++;
+		if (*p == '\n') p++;
+	}
+
+	return NULL;
+}
+
+void SaveSettings(void) {
+	HANDLE hSettingsFile = CreateFileW(INI_FILE, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (hSettingsFile != INVALID_HANDLE_VALUE) {
+		char buffer[256];
+		int len = snprintf(buffer, sizeof(buffer),
+			"[QuickChat]\r\n"
+			"always_on_top=%d\r\n"
+			"flash=%d\r\n"
+			"sound=%d\r\n"
+			"leave_confirm=%d\r\n",
+			always_on_top ? 1 : 0,
+			flash_enabled ? 1 : 0,
+			sound_enabled ? 1 : 0,
+			confirm_enabled ? 1 : 0);
+
+		DWORD bytes_written;
+		WriteFile(hSettingsFile, buffer, len, &bytes_written, NULL);
+		CloseHandle(hSettingsFile);
+	}
+}
+
+void ResetSettings(HWND hWnd) {
+	int result = MessageBoxW(hWnd, L"Are you sure you want to reset all settings?", L"QuickChat", MB_YESNO | MB_ICONWARNING);
+
+	if (result == IDYES) {
+		DeleteFileW(INI_FILE);
+
+		always_on_top = false;
+		flash_enabled = true;
+		sound_enabled = true;
+
+		CheckMenuItem(GetMenu(hWnd), IDM_ALWAYS_ON_TOP, MF_BYCOMMAND | MF_UNCHECKED);
+		CheckMenuItem(GetMenu(hWnd), ID_FLASH_TOGGLE, MF_BYCOMMAND | MF_CHECKED);
+		CheckMenuItem(GetMenu(hWnd), ID_SOUND_TOGGLE, MF_BYCOMMAND | MF_CHECKED);
+
+		SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+		MessageBoxW(hWnd, L"Settings have been reset to default values.", L"QuickChat", MB_OK | MB_ICONINFORMATION);
+	}
+}
+
 // ----- Logging -----
 void LogMessage(const wchar_t* message) {
 	if (!logging_enabled) return;
@@ -702,6 +707,8 @@ void SaveChatToFile(HWND hWnd) {
 
 // ======= 7. Network Core =======
 bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
+	GetLocalComputerName();
+
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
 		ShowError(L"WSAStartup failed.", WSAGetLastError());
@@ -851,6 +858,11 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 	int hs_r_len = strlen(hs_reply);
 	XorObf((unsigned char*)hs_reply, hs_r_len);
 	send(client_socket, hs_reply, hs_r_len, 0);
+	
+	if (hHostInfoDlg) {
+		PostMessageW(hHostInfoDlg, WM_CLOSE, 0, 0);
+		hHostInfoDlg = NULL;
+	}
 
 	ShowMainWindow(hInstance, nCmdShow);
 
@@ -1138,19 +1150,25 @@ INT_PTR CALLBACK ModeSelectProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 				EndDialog(hwnd, IDOK);
 				return TRUE;
 			}
+
 			if (LOWORD(wParam) == 102) {
 				is_server = false;
 				EndDialog(hwnd, IDOK);
 				return TRUE;
 			}
+
 			if (LOWORD(wParam) == 103 || LOWORD(wParam) == IDCANCEL) {
 				EndDialog(hwnd, IDCANCEL);
 				return TRUE;
 			}
-			if (LOWORD(wParam) == 201)
+
+			if (LOWORD(wParam) == 201) {
 				xor_enabled = IsDlgButtonChecked(hwnd, 201) == BST_CHECKED;
-			if (LOWORD(wParam) == 202)
+			}
+
+			if (LOWORD(wParam) == 202) {
 				logging_enabled = IsDlgButtonChecked(hwnd, 202) == BST_CHECKED;
+			}
 			break;
 
 		case WM_CLOSE:
@@ -1256,6 +1274,7 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	hWndGlobal = hWnd;
+	LoadSettings();
 	CreateAppMenu(hWnd);
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
@@ -1266,16 +1285,20 @@ INT_PTR CALLBACK HostInfoProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	switch (msg) {
 		case WM_INITDIALOG:
+			hHostInfoDlg = hwnd;
 			SetDlgItemTextW(hwnd, 301, server_ip);
 			SetDlgItemTextW(hwnd, 302, xor_enabled ? L"Yes" : L"No");
 			return TRUE;
+
 		case WM_COMMAND:
 			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
 				EndDialog(hwnd, LOWORD(wParam));
 				return TRUE;
 			}
 			break;
+
 		case WM_CLOSE:
+			hHostInfoDlg = NULL;
 			EndDialog(hwnd, IDCANCEL);
 			return TRUE;
 	}
@@ -1284,12 +1307,11 @@ INT_PTR CALLBACK HostInfoProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
-		case WM_CREATE: {
+		case WM_CREATE:
 			CreateAppFonts(hWnd);
 			CreateAppControls(hWnd);
 			mainWindowReady = TRUE;
 			return 0;
-		}
 
 		case WM_COMMAND: {
 			int id = LOWORD(wParam);
@@ -1301,26 +1323,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			return 0;
 		}
 
-		case WM_CLOSE: {
+		case WM_CLOSE:
 			HandleMenuCommand(hWnd, IDM_LEAVE);
 			return 0;
-		}
 
-		case WM_DESTROY: {
+		case WM_DESTROY:
 			CleanupGdiResources();
 			CleanupAndExit();
 			return 0;
-		}
 
-		case WM_SIZE: {
+		case WM_SIZE:
 			ResizeMainWindow(hWnd, LOWORD(lParam), HIWORD(lParam));
 			return 0;
-		}
 
-		case WM_SETFOCUS: {
+		case WM_SETFOCUS:
 			SetFocus(hEdit);
 			break;
-		}
 
 		case WM_DROPFILES: {
 			HDROP hDrop = (HDROP)wParam;
@@ -1389,16 +1407,17 @@ void CreateAppFonts(HWND hWnd) {
 
 void CreateAppControls(HWND hWnd) {
 	hMsgDisplay = CreateWindowW(L"EDIT", L"", 
-		WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_MULTILINE | 
-		ES_READONLY | ES_AUTOVSCROLL,
+		WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | WS_VSCROLL | 
+		ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
 		0, 0, 594, 275, hWnd, (HMENU)ID_MSG_DISPLAY, NULL, NULL);
 
 	hEdit = CreateWindowW(L"EDIT", L"", 
-		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_WANTRETURN | WS_VSCROLL,
+		WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | WS_VSCROLL | 
+		ES_MULTILINE | ES_WANTRETURN | ES_NOHIDESEL,
 		0, 278, 510, 46, hWnd, (HMENU)ID_EDIT, NULL, NULL);
 
 	hSendBtn = CreateWindowW(L"BUTTON", L"Send", 
-		WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+		WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
 		510, 278, 85, 46, hWnd, (HMENU)ID_SEND, NULL, NULL);
 
 	SetWindowPos(hWnd, always_on_top ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
@@ -1408,6 +1427,7 @@ void CreateAppControls(HWND hWnd) {
 	SendMessageW(hEdit, EM_SETLIMITTEXT, BUFFER_SIZE - 1, 0);
 
 	oldEditProc = (WNDPROC)SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)EditProc);
+	oldDisplayProc = (WNDPROC)SetWindowLongPtrW(hMsgDisplay, GWLP_WNDPROC, (LONG_PTR)EditProc);
 	DragAcceptFiles(hWnd, TRUE);
 }
 
@@ -1503,19 +1523,42 @@ void ResizeMainWindow(HWND hWnd, int width, int height) {
 }
 
 LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	WNDPROC oldProc = (hWnd == hEdit) ? oldEditProc : oldDisplayProc;
+	
+	if (uMsg == WM_CHAR) {
+		if (wParam == VK_TAB) return 0;
+		if (wParam == VK_RETURN) {
+			if (!(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+				return 0;
+			}
+		}
+	}
+	
 	if (uMsg == WM_GETDLGCODE) {
-		return DLGC_WANTALLKEYS | CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
-	} else if (uMsg == WM_KEYDOWN) {
+		return DLGC_WANTCHARS | DLGC_WANTARROWS | DLGC_WANTMESSAGE;
+	}
+
+	if (uMsg == WM_KEYDOWN) {
 		if (wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
 			SendMessageW(hWnd, EM_SETSEL, 0, -1);
 			return 0;
 		}
 
+		if (wParam == VK_TAB) {
+			HWND hNext = GetNextDlgTabItem(GetParent(hWnd), hWnd, GetKeyState(VK_SHIFT) & 0x8000);
+			if (hNext) SetFocus(hNext);
+			return 0;
+		}
+		
 		if (wParam == VK_RETURN) {
-			if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
-				return CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
+			if (hWnd == hEdit) {
+				if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+					return CallWindowProcW(oldProc, hWnd, uMsg, wParam, lParam);
+				} else {
+					PostMessage(GetParent(hWnd), WM_COMMAND, MAKEWPARAM(ID_SEND, 0), 0);
+					return 0;
+				}
 			} else {
-				PostMessage(GetParent(hWnd), WM_COMMAND, MAKEWPARAM(ID_SEND, 0), 0);
 				return 0;
 			}
 		}
@@ -1534,12 +1577,14 @@ INT_PTR CALLBACK AboutDialogProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
 			SetDlgItemTextW(hWnd, 301, version);
 			return TRUE;
 		}
+
 		case WM_COMMAND:
 			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
 				EndDialog(hWnd, LOWORD(wParam));
 				return TRUE;
 			}
 			break;
+
 		case WM_CLOSE:
 			EndDialog(hWnd, IDCANCEL);
 			return TRUE;
@@ -1551,24 +1596,23 @@ INT_PTR CALLBACK ComputerInfoProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 	(void)lParam;
 	
 	switch (msg) {
-		case WM_INITDIALOG: {
+		case WM_INITDIALOG:
 			const wchar_t* name = (peer_name[0] != L'\0') ? peer_name : L"N/A";
 			SetDlgItemTextW(hWnd, 101, name);
 
 			const wchar_t* ip = is_server ? peer_ip : server_ip;
 			SetDlgItemTextW(hWnd, 102, ip);
 			SetDlgItemTextW(hWnd, 103, xor_enabled ? L"Yes" : L"No");
-
 			SetDlgItemTextW(hWnd, 104, is_running ? L"Yes" : L"No");
-
 			return TRUE;
-		}
+
 		case WM_COMMAND:
 			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
 				EndDialog(hWnd, LOWORD(wParam));
 				return TRUE;
 			}
 			break;
+
 		case WM_CLOSE:
 			EndDialog(hWnd, IDCANCEL);
 			return TRUE;
