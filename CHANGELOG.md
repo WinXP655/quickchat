@@ -1,6 +1,13 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 21 September 2026)**:\
+**QuickChat (Current, 29 September 2026)**:
+- Fixed client connection dialog a bit.
+- Added handling Tab key as changing control.
+- Added blocking WM_CHAR (insert character) for Tab and Enter in message edit.
+- Added closing host information dialog automatically after connect.
+- Minor changes to icon.
+
+**QuickChat (21 September 2026)**:\
 WARNING: Windows 2000/XP is no longer supported by newer versions.
 Minimal version is Windows Vista.
 
