@@ -1,6 +1,29 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 29 September 2026)**:
+**QuickChat (Current, 6 October 2026)**:
+- Fixed oldEditProc in EditProc().
+- Added missing return; to HandleMenuCommand() -> IDM_LEAVE.
+- Added cleaning oldDisplayProc.
+- Added loop exit in accept error loop.
+- Added a 100ms timeout before trying accept again in StartServer().
+- Added proper closing of hReceiveThread.
+- Fixed wcscpy in StartClient() without size check.
+- Fixed client-side peer_ip contained IP:port.
+- Fixed CloseLog to check for chat_log handle.
+- Removed recursive call in AddMessage().
+- Fixed security of ReadIniValue().
+- Fixed overshadowing/leaking of receive thread handle.
+- Added _WIN32_WINNT define to start of file.
+- Added check of disable flag of DisableChatControls() to SendMessageW().
+- Added truncating long message instead preventing showing.
+- Added checking getsockname() result in StartClient().
+- Added resizing controls in ResizeMainWindow() on high DPI.
+- Added showing local name and IP address in computer info dialog.
+- Added explicit whcar.h header for wide functions.
+- Removed dublicating prototype of Disconnect().
+- Replaced strncmp in ProcessIncomingMessage() to memcmp.
+
+**QuickChat (29 September 2026)**:
 - Fixed client connection dialog a bit.
 - Added handling Tab key as changing control.
 - Added blocking WM_CHAR (insert character) for Tab and Enter in message edit.
