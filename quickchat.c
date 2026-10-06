@@ -3,6 +3,7 @@
 // Distributed under MIT License.
 
 // ======= 1. Headers =======
+#define _WIN32_WINNT 0x0600
 #include <winsock2.h>
 #include <windows.h>
 #include <stdbool.h>
@@ -11,6 +12,7 @@
 #include <commctrl.h>
 #include <process.h>
 #include <shellapi.h>
+#include <wchar.h>
 #include "key.h"
 
 // ======= 2. Defines =======
@@ -64,9 +66,9 @@ int error_counter = 0;
 // ----- Network state -----
 SOCKET client_socket = INVALID_SOCKET;
 HANDLE hReceiveThread = NULL;
-wchar_t server_ip[16] = L"127.0.0.1";
-wchar_t peer_ip[16] = L"";
-wchar_t peer_name[256] = L"";
+wchar_t local_ip[16] = L"127.0.0.1";
+wchar_t remote_ip[16] = L"";
+wchar_t remote_name[256] = L"";
 wchar_t computer_name[256] = L"";
 
 // ----- Logging -----
@@ -121,7 +123,6 @@ bool StartClient(HINSTANCE hInstance, int nCmdShow);
 unsigned int __stdcall ReceiveMessages(void* arg);
 void ProcessIncomingMessage(char* buffer, int bytes);
 void XorObf(unsigned char *data, int len);
-void Disconnect(void);
 
 // ----- User Interface -----
 INT_PTR CALLBACK ModeSelectProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -319,7 +320,7 @@ void ShowError(const wchar_t* msg, DWORD err) {
 }
 
 void DisableChatControls(BOOL disable) {
-	SendMessageW(hEdit, EM_SETREADONLY, TRUE, 0);
+	SendMessageW(hEdit, EM_SETREADONLY, disable ? TRUE : FALSE, 0);
 	EnableWindow(hSendBtn, !disable);
 }
 
@@ -339,18 +340,23 @@ void FlashMessageWindow(HWND hWnd) {
 void AddMessage(const wchar_t* msg) {
 	if (!hMsgDisplay || !msg || !*msg) return;
 
+	wchar_t truncated[BUFFER_SIZE];
+	const wchar_t* to_display = msg;
+
 	if (wcslen(msg) > BUFFER_SIZE) {
-		wchar_t longmsg_err[511] = L"[ERROR]: Message is too long to be displayed.";
-		AddMessage(longmsg_err);
-		if (is_server) LogMessage(longmsg_err);
+		wcsncpy(truncated, msg, BUFFER_SIZE - 20);
+		truncated[BUFFER_SIZE - 20] = L'\0';
+		wcscat(truncated, L"... [truncated]");
+		to_display = truncated;
+		if (is_server) LogMessage(L"[WARNING] Message is too long to be displayed. Contents was truncated.");
 		return;
 	}
-	int len = GetWindowTextLengthW(hMsgDisplay);
 
+	int len = GetWindowTextLengthW(hMsgDisplay);
 	SendMessageW(hMsgDisplay, EM_SETSEL, len, len);
 	if (len > 0) SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)L"\r\n");
 
-	if (!SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)msg)) {
+	if (!SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)to_display)) {
 		if (is_server) {
 			wchar_t addmsg_err[512];
 			swprintf(addmsg_err, sizeof(addmsg_err) / sizeof(wchar_t), L"[ERROR]: Failed to display message. Error: %lu.", GetLastError());
@@ -517,6 +523,13 @@ char* ReadIniValue(const char* buffer, const char* key, char* out_value, size_t 
 			continue;
 		}
 
+		if (eq == p) {
+			p = eq + 1;
+			while (*p && *p != '\n') p++;
+			if (*p =='\n') p++;
+			continue;
+		}
+
 		const char* key_start = p;
 		const char* key_end = eq - 1;
 		while (key_end > key_start && (*key_end == ' ' || *key_end == '\t')) key_end--;
@@ -631,6 +644,10 @@ void LogMessage(const wchar_t* message) {
 }
 
 void CloseLog(void) {
+	if (chat_log == NULL || chat_log == INVALID_HANDLE_VALUE) {
+		return;
+	}
+
 	time_t now = time(NULL);
 	struct tm *t = localtime(&now);
 	wchar_t timestamp[64];
@@ -723,9 +740,9 @@ bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	unsigned int threadID;
-	HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, ReceiveMessages, NULL, 0, &threadID);
+	hReceiveThread = (HANDLE)_beginthreadex(NULL, 0, ReceiveMessages, NULL, 0, &threadID);
 
-	if (hThread == NULL) {
+	if (hReceiveThread == NULL) {
 		ShowError(L"Failed to start receive thread.", GetLastError());
 		CleanupAndExit();
 		return false;
@@ -760,11 +777,11 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 		return false;
 	}
 
-	GetDefaultIP(server_ip, sizeof(server_ip) / sizeof(wchar_t));
+	GetDefaultIP(local_ip, sizeof(local_ip) / sizeof(wchar_t));
 
 	wchar_t bind_msg[512];
 	const wchar_t* mode_str = xor_enabled ? L"QC with XOR" : L"QC";
-	swprintf(bind_msg, sizeof(bind_msg) / sizeof(wchar_t), L"Host started: %ls on address %ls port %d.", mode_str, server_ip, active_port);
+	swprintf(bind_msg, sizeof(bind_msg) / sizeof(wchar_t), L"Host started: %ls on address %ls port %d.", mode_str, local_ip, active_port);
 	LogMessage(bind_msg);
 
 	if (listen(server_fd, 1) == SOCKET_ERROR) {
@@ -781,6 +798,11 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 
 		SOCKET temp_client = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
 		if (temp_client == INVALID_SOCKET) {
+			DWORD err = WSAGetLastError();
+			if (err == WSAEINTR || err == WSAENOTSOCK) {
+				break;
+			}
+			Sleep(100);
 			continue;
 		}
 
@@ -845,8 +867,8 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 		char ip_utf8[16];
 		strncpy(ip_utf8, inet_ntoa(client_addr.sin_addr), 15);
 		ip_utf8[15] = '\0';
-		MultiByteToWideChar(CP_UTF8, 0, ip_utf8, -1, peer_ip, sizeof(peer_ip) / sizeof(wchar_t));
-		MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, peer_name, sizeof(peer_name) / sizeof(wchar_t));
+		MultiByteToWideChar(CP_UTF8, 0, ip_utf8, -1, remote_ip, sizeof(remote_ip) / sizeof(wchar_t));
+		MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, remote_name, sizeof(remote_name) / sizeof(wchar_t));
 		break;
 	}
 
@@ -876,7 +898,7 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	wchar_t join_msg[512];
-	swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: %ls connected from %ls.", peer_name, peer_ip);
+	swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: %ls connected from %ls.", remote_name, remote_ip);
 	AddMessage(join_msg);
 	LogMessage(join_msg);
 	
@@ -901,9 +923,9 @@ bool StartClient(HINSTANCE hInstance, int nCmdShow) {
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(active_port);
 
-	char server_ip_utf8[16];
-	WideCharToMultiByte(CP_UTF8, 0, server_ip, -1, server_ip_utf8, sizeof(server_ip_utf8), NULL, NULL);
-	server_addr.sin_addr.s_addr = inet_addr(server_ip_utf8);
+	char remote_ip_utf8[16];
+	WideCharToMultiByte(CP_UTF8, 0, remote_ip, -1, remote_ip_utf8, sizeof(remote_ip_utf8), NULL, NULL);
+	server_addr.sin_addr.s_addr = inet_addr(remote_ip_utf8);
 
 	if (connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
 		int err = WSAGetLastError();
@@ -927,11 +949,19 @@ bool StartClient(HINSTANCE hInstance, int nCmdShow) {
 
 	struct sockaddr_in server_info;
 	int len = sizeof(server_info);
-	getsockname(client_socket, (struct sockaddr*)&server_info, &len);
-	wchar_t ip_w[16];
-	DWORD ip_len = 16;
-	WSAAddressToStringW((LPSOCKADDR)&server_info, sizeof(server_info), NULL, ip_w, &ip_len);
-	wcscpy(peer_ip, ip_w);
+	if (getsockname(client_socket, (struct sockaddr*)&server_info, &len) != 0) {
+		wcscpy(local_ip, L"<Unknown>");
+	} else {
+		wchar_t ip_w[64];
+		DWORD ip_len = 64;
+		WSAAddressToStringW((LPSOCKADDR)&server_info, sizeof(server_info), NULL, ip_w, &ip_len);
+
+		wchar_t* colon = wcschr(ip_w, L':');
+		if (colon) *colon = L'\0';
+
+		wcsncpy(local_ip, ip_w, 15);
+		local_ip[15] = L'\0';
+	}
 
 	char hs[256];
 	int pos = snprintf(hs, sizeof(hs), "%s", QC_LABEL);
@@ -960,8 +990,8 @@ bool StartClient(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	const char* name_ptr = hs_reply + strlen(QC_LABEL);
-	MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, peer_name, 256);
-	if (peer_name[0] == L'\0') wcscpy(peer_name, L"<Unknown>");
+	MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, remote_name, 256);
+	if (remote_name[0] == L'\0') wcscpy(remote_name, L"<Unknown>");
 
 	ShowMainWindow(hInstance, nCmdShow);
 
@@ -975,7 +1005,7 @@ bool StartClient(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	wchar_t join_msg[512];
-	swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: Connected to %ls at %ls.", peer_name, server_ip);
+	swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: Connected to %ls at %ls.", remote_name, remote_ip);
 	AddMessage(join_msg);
 	
 	return true;
@@ -1039,7 +1069,7 @@ void ProcessIncomingMessage(char* buffer, int bytes) {
 
 	FlashMessageWindow(hWndGlobal);
 
-	if (strncmp(buffer, "[DISCONNECT]", 12) == 0) {
+	if (bytes >= 12 && memcmp(buffer, "[DISCONNECT]", 12) == 0) {
 		DisableChatControls(TRUE);
 		PlayNotifySound(SOUND_LEAVE);
 		DragAcceptFiles(hWndGlobal, FALSE);
@@ -1234,8 +1264,8 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 					return TRUE;
 				}
  
-				wcscpy(server_ip, p);
-				server_ip[sizeof(server_ip)/sizeof(wchar_t) - 1] = L'\0';
+				wcscpy(remote_ip, p);
+				remote_ip[sizeof(remote_ip) / sizeof(wchar_t) - 1] = L'\0';
 				EndDialog(hwnd, IDOK);
 			} else if (LOWORD(wParam) == IDCANCEL) {
 				EndDialog(hwnd, IDCANCEL);
@@ -1261,7 +1291,7 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 	RegisterClassW(&wc);
 
 	wchar_t title[512];
-	swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat - %ls", peer_name);
+	swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat - %ls", remote_name);
 
 	HWND hWnd = CreateWindowW(L"QuickChatWndClass", title,
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX,
@@ -1286,7 +1316,7 @@ INT_PTR CALLBACK HostInfoProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg) {
 		case WM_INITDIALOG:
 			hHostInfoDlg = hwnd;
-			SetDlgItemTextW(hwnd, 301, server_ip);
+			SetDlgItemTextW(hwnd, 301, local_ip);
 			SetDlgItemTextW(hwnd, 302, xor_enabled ? L"Yes" : L"No");
 			return TRUE;
 
@@ -1441,8 +1471,15 @@ void HandleSendCommand(HWND hWnd) {
 void HandleMenuCommand(HWND hWnd, int id) {
 	switch (id) {
 		case IDM_LEAVE:
-			if (!is_running) CleanupAndExit();
-			if (!confirm_enabled) Disconnect();
+			if (!is_running) {
+				CleanupAndExit();
+				return;
+			}
+
+			if (!confirm_enabled) {
+				Disconnect();
+				return;
+			}
 
 			if (MessageBoxW(hWnd, L"Leave current chat?", L"QuickChat", MB_ICONQUESTION | MB_YESNO) == IDYES) {
 				Disconnect();
@@ -1499,6 +1536,10 @@ void CleanupGdiResources(void) {
 		SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)oldEditProc);
 	}
 
+	if (oldDisplayProc) {
+		SetWindowLongPtrW(hMsgDisplay, GWLP_WNDPROC, (LONG_PTR)oldDisplayProc);
+	}
+
 	if (hFont) {
 		DeleteObject(hFont);
 		hFont = NULL;
@@ -1513,9 +1554,21 @@ void CleanupGdiResources(void) {
 
 void ResizeMainWindow(HWND hWnd, int width, int height) {
 	(void)hWnd;
+	
+	if (!hMsgDisplay || !hEdit || !hSendBtn) return;
 
-	int edit_height = 46;
-	int send_width = 85;
+	HDC hdc = GetDC(hWnd);
+	int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+	ReleaseDC(hWnd, hdc);
+
+	const int base_edit_height = 46;
+	const int base_send_width = 85;
+
+	int edit_height = MulDiv(base_edit_height, dpi, 96);
+	int send_width = MulDiv(base_send_width, dpi, 96);
+
+	if (edit_height < 20) edit_height = 20;
+	if (send_width < 40) send_width = 40;
 
 	SetWindowPos(hMsgDisplay, NULL, 0, 0, width, height - edit_height, SWP_NOZORDER);
 	SetWindowPos(hEdit, NULL, 0, height - edit_height, width - send_width, edit_height, SWP_NOZORDER);
@@ -1564,7 +1617,7 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		}
 	}
 
-	return CallWindowProcW(oldEditProc, hWnd, uMsg, wParam, lParam);
+	return CallWindowProcW(oldProc, hWnd, uMsg, wParam, lParam);
 }
 
 INT_PTR CALLBACK AboutDialogProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -1573,7 +1626,7 @@ INT_PTR CALLBACK AboutDialogProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
 	switch (msg) {
 		case WM_INITDIALOG: {
 			wchar_t version[64];
-			swprintf(version, sizeof(version) / sizeof(wchar_t), L"QuickChat (%s)", __DATE__);
+			swprintf(version, sizeof(version) / sizeof(wchar_t), L"QuickChat (%hs)", __DATE__);
 			SetDlgItemTextW(hWnd, 301, version);
 			return TRUE;
 		}
@@ -1593,31 +1646,34 @@ INT_PTR CALLBACK AboutDialogProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
 }
 
 INT_PTR CALLBACK ComputerInfoProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	(void)lParam;
-	
-	switch (msg) {
-		case WM_INITDIALOG:
-			const wchar_t* name = (peer_name[0] != L'\0') ? peer_name : L"N/A";
-			SetDlgItemTextW(hWnd, 101, name);
+    (void)lParam;
 
-			const wchar_t* ip = is_server ? peer_ip : server_ip;
-			SetDlgItemTextW(hWnd, 102, ip);
-			SetDlgItemTextW(hWnd, 103, xor_enabled ? L"Yes" : L"No");
-			SetDlgItemTextW(hWnd, 104, is_running ? L"Yes" : L"No");
-			return TRUE;
+    switch (msg) {
+        case WM_INITDIALOG: {
+            SetDlgItemTextW(hWnd, 105, computer_name);
+            SetDlgItemTextW(hWnd, 106, local_ip);
 
-		case WM_COMMAND:
-			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
-				EndDialog(hWnd, LOWORD(wParam));
-				return TRUE;
-			}
-			break;
+            const wchar_t* remote_name_display = (remote_name[0] != L'\0') ? remote_name : L"N/A";
+            SetDlgItemTextW(hWnd, 101, remote_name_display);
 
-		case WM_CLOSE:
-			EndDialog(hWnd, IDCANCEL);
-			return TRUE;
-	}
-	return FALSE;
+            SetDlgItemTextW(hWnd, 102, remote_ip);
+            SetDlgItemTextW(hWnd, 103, xor_enabled ? L"Yes" : L"No");
+            SetDlgItemTextW(hWnd, 104, is_running ? L"Yes" : L"No");
+            return TRUE;
+        }
+
+        case WM_COMMAND:
+            if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+                EndDialog(hWnd, LOWORD(wParam));
+                return TRUE;
+            }
+            break;
+
+        case WM_CLOSE:
+            EndDialog(hWnd, IDCANCEL);
+            return TRUE;
+    }
+    return FALSE;
 }
 
 // ======= 9. Drag-and-Drop Functions =======

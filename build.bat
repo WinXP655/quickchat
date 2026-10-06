@@ -107,7 +107,7 @@ windres --target=pe-i386 resources.rc -o resources.o || goto :build_failed
 echo [OK] Resources compiled
 
 echo Compiling QuickChat...
-gcc quickchat.c servconn.o resources.o about.o start.o compinfo.o hostinfo.o -o quickchat.exe -m32 -mwindows  -municode -lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32 -Wl,--gc-sections -Wl,--subsystem,windows:6.0 -Os -s -ffunction-sections -fdata-sections -Wall -Wextra
+gcc quickchat.c servconn.o resources.o about.o start.o compinfo.o hostinfo.o -o quickchat.exe -m32 -mwindows  -municode -lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32 -Wl,--gc-sections -Wl,--subsystem,windows:6.0 -Os -s -ffunction-sections -fdata-sections -fno-strict-aliasing -Wall -Wextra
 if %errorlevel% neq 0 (
     echo [ERROR] Build FAILED
     exit /b 1
