@@ -48,7 +48,7 @@ For client, added option to save just chat history:
 2. Save Chat
 
 ## Protocol
-It uses a very simple custom protocol. The base protocol is QuickChat Plaintext (QC).\
+It uses a very simple custom protocol. The base protocol is QuickChat Plaintext (QC).
 1. Who starts first: Client. Host never sends anything until it will be QC handshake.
 2. Client sends handshake in following format: QC:PCNAME\0.
    Replace PCNAME with your computer name or what you want remote side to see.\
@@ -61,9 +61,9 @@ It uses a very simple custom protocol. The base protocol is QuickChat Plaintext 
 > Host and client side can delete logs/history at any time, it is stored only locally.
 
 ## Use сases
-- **Quick 1-to-1 chat in a local network**: No server, no accounts, no setup.\
-- **Private chat**: Optional XOR layer hides traffic from casual inspectors.\
-- **Portable chat**: Single .exe file, no registry, no install, no traces.\
+- **Quick 1-to-1 chat in a local network**: No server, no accounts, no setup.
+- **Private chat**: Optional XOR layer hides traffic from casual inspectors.
+- **Portable chat**: Single .exe file, no registry, no install, no traces.
 - **One-time sessions with no traces**: Logs off by default. Close the app and nothing remains.
 
 ## Changelog
