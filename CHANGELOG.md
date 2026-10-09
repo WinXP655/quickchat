@@ -1,6 +1,12 @@
 ## QuickChat Modern Family
 
-**QuickChat (Current, 6 October 2026)**:
+**QuickChat (Current, 9 October 2026)**:
+- Removed return call in AddMessage, which prevented displaying truncated message.
+- Removed unused logging for failure of adding message to history.
+- Added showing exact characters count to too long message log entry.
+- Fixed characters count in empty handshake and too large packet errors.
+
+**QuickChat (6 October 2026)**:
 - Fixed oldEditProc in EditProc().
 - Added missing return; to HandleMenuCommand() -> IDM_LEAVE.
 - Added cleaning oldDisplayProc.
