@@ -1,4 +1,4 @@
-## QuickChat Modern Family
+## Public Releases
 
 **QuickChat (Current, 9 October 2026)**:
 - Removed return call in AddMessage, which prevented displaying truncated message.
@@ -74,12 +74,6 @@ Minimal version is Windows Vista.
 - Removed error messages from GetDefaultIP.
 - Changed XOR key.
 
-Developer note:
-This update is even harder than previous, but message boxes do not allow such customization like custom buttons.
-When needed custom button texts, message boxes are just trash - they do not allow this. And yes, this API is ancient :D
-RC files have major con - they can be removed and apps will break, but who cares? No one, because it's best way for custom dialogs.
-Also message boxes are largely obsolete even by Microsoft - they recommend or use RC, or TaskDialog API (but that's Vista and higher stuff).
-
 **QuickChat (5 September 2026)**:
 - Removed Close Connection.
 - Removed ping.
@@ -112,7 +106,7 @@ Also message boxes are largely obsolete even by Microsoft - they recommend or us
 - Fixed Always on Top setting entry was ignored when loading settings.
 - Grouped function prototypes into categories.
 - Relaced some fixed values with "sizeof(buffer) / sizeof(wchar_t)".\
-This may be last update before setting project state to frozen. Who knows when it will happen? ¯\\_(ツ)_/¯
+This may be last update. Project may be frozen in future.
 
 **QuickChat (18 August 2026)**:
 - Added key combinations using different method.\
@@ -134,7 +128,7 @@ This may be last update before setting project state to frozen. Who knows when i
   Created using Audacity and 2-3 tones.
 - Slightly updated icon.
 - Added drag-and-drop text files to message edit.
-  It extracts file contents and write contents to edit field.
+  It extracts file contents and write contents to edit field.\
   Limitations:
   1. 4096 characters
   2. Only .txt, .log, .md, .c, .cpp, .h, .hpp, .py, .js, .sh, .bat, .cmd, .ps1,
@@ -147,7 +141,7 @@ This may be last update before setting project state to frozen. Who knows when i
 - Added disabling drag-and-drop after disconnect.
 - Removed unused "[DISCONNECTED]" string.
 - Added logging host IP when logging enabled.
-- Added showing error code in log open fail.
+- Added showing error code in log open fail.\
   Now it does not break Common Controls v6.
 - Minimum Windows subsystem changed from 4.0 (9x/NT4) to 5.0 (2000).
 - Added saving settings to quickchat.ini.
@@ -166,16 +160,14 @@ This may be last update before setting project state to frozen. Who knows when i
 - "Could not load connection dialog" now triggered when DialogBoxParamW have any negative value (-1, -2 and etc).
 - Make some parts of code more readable.
 - Fixed "Connection lost" showing buffer address instead error code.
-- Replace sounds to sounds with open license. - delayed for third time and still wasn't done, wow
-  (sounds are pain to find)
+- Replace sounds with custom.
 
 **QuickChat (26 July 2026)**:
 - Added /clean, /minbuild, /help to build system.
 - Removed unused versioninfo.txt.
 - Added separate connection dialog for minbuild type.
 - Added compile date to About dialog.
-- Added .gitignore.
-
+- Added .gitignore.\
 (mostly build system update, with some small UI update)
 
 **QuickChat (16 July 2026)**:
@@ -184,9 +176,8 @@ This may be last update before setting project state to frozen. Who knows when i
 - Better build system.
 - Added 7z.exe to build package.
 
-**QuickChat (12 July 2026)**:
-
-**Version Note**: Windows 9x (98, ME) support is discontinued since this version. If you want to continue using QuickChat, please upgrade your Windows version.
+**QuickChat (12 July 2026)**:\
+Windows 9x (98, ME) support is discontinued since this version. Minimal version is Windows 2000.
 
 - First public release.
 - Final code refactor.
@@ -201,7 +192,9 @@ This may be last update before setting project state to frozen. Who knows when i
 - Renamed chatlog.log to chatlog.txt.
 - Buffer is 8192 characters because of Unicode.
 
-*Everything goes below was stage when project was private*.
+## Internal History (Pre-Public)
+These versions were never publicly released. They are listed here for historical context only.\
+No binaries or source code are available for these versions.
 
 **QuickChat (30 June 2026)**:
 - General code readability and structure refactor (naming, function order, warning icons).
@@ -211,7 +204,7 @@ This may be last update before setting project state to frozen. Who knows when i
 - Cleaned globals: removed dead g_hInstance, explicit NULL init for UI handles.
 - Threading: replaced _beginthread with _beginthreadex; ReceiveMessages now __stdcall, proper thread termination in CleanupAndExit.
 - Updated XOR key.
-- Buffer limit now uses BUFFER_SIZE - 1.
+- Buffer limit now uses BUFFER_SIZE - 1.\
 Note: This is last version for Windows 9x
 
 **QuickChat (27 June 2026)**:
