@@ -93,7 +93,7 @@ volatile BOOL mainWindowReady = FALSE;
 
 // ======= 4. Prototypes =======
 // ----- Core Functions -----
-LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo);
+long WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo);
 bool InitializeLog(HANDLE hLogFile);
 
 // ----- Helper Functions -----
@@ -216,7 +216,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	return msg.wParam;
 }
 
-LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
+long WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
 	DWORD code = ExceptionInfo->ExceptionRecord->ExceptionCode;
 	void* address = ExceptionInfo->ExceptionRecord->ExceptionAddress;
 
@@ -348,24 +348,19 @@ void AddMessage(const wchar_t* msg) {
 		truncated[BUFFER_SIZE - 20] = L'\0';
 		wcscat(truncated, L"... [truncated]");
 		to_display = truncated;
-		if (is_server) LogMessage(L"[WARNING] Message is too long to be displayed. Contents was truncated.");
-		return;
+
+		wchar_t log_msg[512];
+		swprintf(log_msg, sizeof(log_msg) / sizeof(wchar_t),
+				 L"[WARNING] Message is too long (%zu chars), truncated to %d.",
+				 wcslen(msg), BUFFER_SIZE - 1);
+		if (is_server) LogMessage(log_msg);
 	}
 
 	int len = GetWindowTextLengthW(hMsgDisplay);
 	SendMessageW(hMsgDisplay, EM_SETSEL, len, len);
 	if (len > 0) SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)L"\r\n");
 
-	if (!SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)to_display)) {
-		if (is_server) {
-			wchar_t addmsg_err[512];
-			swprintf(addmsg_err, sizeof(addmsg_err) / sizeof(wchar_t), L"[ERROR]: Failed to display message. Error: %lu.", GetLastError());
-			if (is_server) LogMessage(addmsg_err);
-		}
-		SetFocus(hEdit);
-		return;
-	}
-
+	SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)to_display);
 	SendMessageW(hMsgDisplay, WM_VSCROLL, SB_BOTTOM, 0);
 }
 
@@ -818,7 +813,7 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 			LogMessage(L"[SECURITY]: Empty or timed-out handshake. Connection closed.");
 
 			if (!xor_enabled) {
-				send(temp_client, "QCERR: No data", 24, 0);
+				send(temp_client, "QCERR: No data", 14, 0);
 			}
 
 			closesocket(temp_client);
@@ -829,7 +824,7 @@ bool StartServer(HINSTANCE hInstance, int nCmdShow) {
 			LogMessage(L"[SECURITY]: Handshake is too large. Connection closed.");
 
 			if (!xor_enabled) {
-				send(temp_client, "QCERR: Packet is too large", 24, 0);
+				send(temp_client, "QCERR: Packet is too large", 26, 0);
 			}
 
 			closesocket(temp_client);
@@ -1646,34 +1641,34 @@ INT_PTR CALLBACK AboutDialogProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
 }
 
 INT_PTR CALLBACK ComputerInfoProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    (void)lParam;
+	(void)lParam;
 
-    switch (msg) {
-        case WM_INITDIALOG: {
-            SetDlgItemTextW(hWnd, 105, computer_name);
-            SetDlgItemTextW(hWnd, 106, local_ip);
+	switch (msg) {
+		case WM_INITDIALOG: {
+			SetDlgItemTextW(hWnd, 105, computer_name);
+			SetDlgItemTextW(hWnd, 106, local_ip);
 
-            const wchar_t* remote_name_display = (remote_name[0] != L'\0') ? remote_name : L"N/A";
-            SetDlgItemTextW(hWnd, 101, remote_name_display);
+			const wchar_t* remote_name_display = (remote_name[0] != L'\0') ? remote_name : L"N/A";
+			SetDlgItemTextW(hWnd, 101, remote_name_display);
 
-            SetDlgItemTextW(hWnd, 102, remote_ip);
-            SetDlgItemTextW(hWnd, 103, xor_enabled ? L"Yes" : L"No");
-            SetDlgItemTextW(hWnd, 104, is_running ? L"Yes" : L"No");
-            return TRUE;
-        }
+			SetDlgItemTextW(hWnd, 102, remote_ip);
+			SetDlgItemTextW(hWnd, 103, xor_enabled ? L"Yes" : L"No");
+			SetDlgItemTextW(hWnd, 104, is_running ? L"Yes" : L"No");
+			return TRUE;
+		}
 
-        case WM_COMMAND:
-            if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
-                EndDialog(hWnd, LOWORD(wParam));
-                return TRUE;
-            }
-            break;
+		case WM_COMMAND:
+			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+				EndDialog(hWnd, LOWORD(wParam));
+				return TRUE;
+			}
+			break;
 
-        case WM_CLOSE:
-            EndDialog(hWnd, IDCANCEL);
-            return TRUE;
-    }
-    return FALSE;
+		case WM_CLOSE:
+			EndDialog(hWnd, IDCANCEL);
+			return TRUE;
+	}
+	return FALSE;
 }
 
 // ======= 9. Drag-and-Drop Functions =======
