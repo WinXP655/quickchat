@@ -1,6 +1,11 @@
 ## Public Releases
 
-**QuickChat (Current, 9 October 2026)**:
+**QuickChat (Current, 11 October 2026)**:
+- Changed Send button text size to 9pt.
+- Separated sendling leave message to separate function.
+- Added arrow cursor over disabled controls.
+
+**QuickChat (9 October 2026)**:
 - Removed return call in AddMessage, which prevented displaying truncated message.
 - Removed unused logging for failure of adding message to history.
 - Added showing exact characters count to too long message log entry.
