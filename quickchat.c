@@ -115,6 +115,7 @@ char* ReadIniValue(const char* buffer, const char* key, char* out_value, size_t 
 void Disconnect(void);
 void SaveChatToFile(HWND hWnd);
 void ResetSettings(HWND hWnd);
+void SendLeaveMessage(void);
 
 // ----- Network Core -----
 bool InitializeNetwork(bool server_mode, HINSTANCE hInstance, int nCmdShow);
@@ -418,6 +419,11 @@ bool GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 }
 
 void Disconnect(void) {
+	SendLeaveMessage();
+	CleanupAndExit();
+}
+
+void SendLeaveMessage(void) {
 	wchar_t leave_msg[512];
 	swprintf(leave_msg, sizeof(leave_msg) / sizeof(wchar_t), L"[DISCONNECT]: %ls left the chat.", computer_name);
 	AddMessage(leave_msg);
@@ -433,8 +439,6 @@ void Disconnect(void) {
 		XorObf(encbuf, msg_len);
 		send(client_socket, (char*)encbuf, msg_len, 0);
 	}
-
-	CleanupAndExit();
 }
 
 // ----- System -----
@@ -1283,6 +1287,7 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 	wc.lpszClassName = L"QuickChatWndClass";
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 	wc.hIcon = LoadIconW(hInstance, L"ICON");
+	wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
 	RegisterClassW(&wc);
 
 	wchar_t title[512];
@@ -1416,16 +1421,15 @@ void CreateAppFonts(HWND hWnd) {
 	ReleaseDC(hWnd, hdc);
 
 	LOGFONTW lf = {0};
+	lf.lfHeight = -MulDiv(9, dpi, 72);
 	lf.lfCharSet = DEFAULT_CHARSET;
 	lf.lfQuality = DEFAULT_QUALITY;
 	lf.lfPitchAndFamily = DEFAULT_PITCH | FF_DONTCARE;
 	wcscpy(lf.lfFaceName, L"Tahoma");
 
-	lf.lfHeight = -MulDiv(9, dpi, 72);
 	lf.lfWeight = FW_NORMAL;
 	hFont = CreateFontIndirectW(&lf);
 
-	lf.lfHeight = -MulDiv(8, dpi, 72);
 	lf.lfWeight = FW_BOLD;
 	hFontBold = CreateFontIndirectW(&lf);
 }
