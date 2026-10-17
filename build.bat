@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 set REKEY=0
 set PACK=0
@@ -20,6 +20,11 @@ shift
 goto :parse_args
 :done_parse
 
+if %NOCLEANKEY%==1 if %CLEAN%==0 (
+    echo [WARN] /nocleankey is only meaningful with /clean. Ignored.
+    set NOCLEANKEY=0
+)
+
 if %HELP%==1 (
     echo QuickChat Build Environment
     echo This script is used to build QuickChat with different configurations.
@@ -38,11 +43,17 @@ if %HELP%==1 (
 
 echo Build parameters: Clean=%CLEAN% MinBuild=%MINBUILD% ReKey=%REKEY% Pack=%PACK% NoCleanKey=%NOCLEANKEY%
 
-set WINDRES=windres --target=pe-i386
-set CFLAGS=-m32 -municode -lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32 -Wall -Wextra
+set CC=gcc
+set WINDRES=windres
+set WINDRES_TARGET=--target=pe-i386
+set ARCH_FLAGS=-m32 -municode
+set COMMON_LIBS=-lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32
+set COMMON_WARN=-Wall -Wextra
+set CFLAGS_FULL=-Os -s -ffunction-sections -fdata-sections -fno-strict-aliasing -mwindows -Wl,--gc-sections
+set ARTIFACTS=about.o compinfo.o hostinfo.o resources.o servconn.o start.o chatlog.txt quickchat.ini quickchat.exe QuickChat.zip
 
 if %CLEAN%==1 (
-    for %%F in (about.o chatlog.txt compinfo.o hostinfo.o quickchat.exe QuickChat.zip resources.o servconn.o start.o quickchat.ini) do (
+    for %%F in (%ARTIFACTS%) do (
         if exist %%F del %%F
     )
     if %NOCLEANKEY%==0 if exist key.h del key.h
@@ -56,18 +67,17 @@ if %MINBUILD%==1 (
         goto end
     )
     if not exist key.h python keygen.py
-    if not exist start.o %WINDRES% start.rc -o start.o
-    if not exist hostinfo.o %WINDRES% hostinfo.rc -o hostinfo.o
-    gcc quickchat.c minbuildconn.o start.o hostinfo.o -o quickchat.exe %CFLAGS% || goto :build_failed
+    if not exist start.o %WINDRES% %WINDRES_TARGET% start.rc -o start.o || goto :build_failed
+    if not exist hostinfo.o %WINDRES% %WINDRES_TARGET% hostinfo.rc -o hostinfo.o || goto :build_failed
+    %CC% quickchat.c minbuildconn.o start.o hostinfo.o -o quickchat.exe %ARCH_FLAGS% %COMMON_LIBS% %COMMON_WARN% || goto :build_failed
     echo Done.
     goto end
 )
 
-for %%F in (about.o chatlog.txt compinfo.o hostinfo.o quickchat.exe QuickChat.zip resources.o servconn.o start.o quickchat.ini) do (
-    if exist %%F set PREVBLD=1
+for %%F in (%ARTIFACTS%) do (
+    if exist "%%F" set PREVBLD=1
 )
-
-if "%PREVBLD%"=="1" echo Warning! Previous build files detected. Run "build.bat /clean" first.
+if !PREVBLD!==1 echo [WARN] Previous build files detected. Run "build.bat /clean" first.
 
 if %REKEY%==1 (
     echo Rekeying: removing old key.h...
@@ -87,27 +97,27 @@ if not exist key.h (
 )
 
 echo Building dialog - Connect to Host...
-windres --target=pe-i386 -c 65001 servconn.rc -o servconn.o || goto :build_failed
+%WINDRES% %WINDRES_TARGET% -c 65001 servconn.rc -o servconn.o || goto :build_failed
 
 echo Building dialog - Main...
-windres --target=pe-i386 -c 65001 start.rc -o start.o || goto :build_failed
+%WINDRES% %WINDRES_TARGET% -c 65001 start.rc -o start.o || goto :build_failed
 
 echo Building dialog - Host Info...
-windres --target=pe-i386 -c 65001 hostinfo.rc -o hostinfo.o || goto :build_failed
+%WINDRES% %WINDRES_TARGET% -c 65001 hostinfo.rc -o hostinfo.o || goto :build_failed
 
 echo Building dialog - About...
-windres --target=pe-i386 -c 65001 about.rc -o about.o || goto :build_failed
+%WINDRES% %WINDRES_TARGET% -c 65001 about.rc -o about.o || goto :build_failed
 
 echo Building dialog - Computer Info...
-windres --target=pe-i386 -c 65001 compinfo.rc -o compinfo.o || goto :build_failed
+%WINDRES% %WINDRES_TARGET% -c 65001 compinfo.rc -o compinfo.o || goto :build_failed
 echo [OK] Dialogs compiled
 
 echo Building resources...
-windres --target=pe-i386 resources.rc -o resources.o || goto :build_failed
+%WINDRES% %WINDRES_TARGET% resources.rc -o resources.o || goto :build_failed
 echo [OK] Resources compiled
 
 echo Compiling QuickChat...
-gcc quickchat.c servconn.o resources.o about.o start.o compinfo.o hostinfo.o -o quickchat.exe -m32 -mwindows  -municode -lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32 -Wl,--gc-sections -Wl,--subsystem,windows:6.0 -Os -s -ffunction-sections -fdata-sections -fno-strict-aliasing -Wall -Wextra
+%CC% quickchat.c servconn.o resources.o about.o start.o compinfo.o hostinfo.o -o quickchat.exe %ARCH_FLAGS% %COMMON_LIBS% %COMMON_WARN% %CFLAGS_FULL% || goto :build_failed
 if %errorlevel% neq 0 (
     echo [ERROR] Build FAILED
     exit /b 1
@@ -116,17 +126,14 @@ echo [OK] Build successful: quickchat.exe
 
 if %PACK%==1 (
     echo Packing final package...
-    7z a QuickChat.zip readme.txt > nul
-    7z a QuickChat.zip join.wav > nul
-    7z a QuickChat.zip leave.wav > nul
-    7z a QuickChat.zip newmsg.wav > nul
-    7z a QuickChat.zip quickchat.exe > nul
-    if %errorlevel% neq 0 (
-        echo [ERROR] Packing FAILED
-        exit /b 1
-    )
+
+    if exist QuickChat.zip del /f /q QuickChat.zip >nul 2>&1
+
+    7z a -tzip -y QuickChat.zip readme.txt join.wav leave.wav newmsg.wav quickchat.exe >nul
+    if errorlevel 1 goto :build_failed
+
     echo [OK] Package created: QuickChat.zip
-    powershell Get-FileHash .\QuickChat.zip
+    powershell -NoProfile -Command "Get-FileHash -Algorithm SHA256 .\QuickChat.zip"
 ) else (
     echo [INFO] Skipping pack ^(use build /pack to create archive^)
 )
@@ -137,4 +144,5 @@ exit /b 0
 
 :build_failed
 echo [ERROR] Build FAILED
+endlocal
 exit /b 1
