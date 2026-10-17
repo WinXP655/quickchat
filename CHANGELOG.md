@@ -1,6 +1,42 @@
 ## Public Releases
 
-**QuickChat (Current, 11 October 2026)**:
+**QuickChat (Current, 17 October 2026)**:
+- Removed unused GetTickCount64 (was breaking XP/2000 IAT compatibility).
+- Added ResetSettings resetting confirmation toggle.
+- Rearranged functions by domain.
+- Replaced ExitProcess on malloc failure with returning NULL/FALSE.
+- Added ANSI fallback when a dropped file can't be read as UTF-8.
+- Replaced direct is_running access with InterlockedExchange / InterlockedCompareExchange.
+- Added WaitForSingleObject for recv thread (non-blocking for UI).
+  Note: reverted to just CloseHandle - still causes deadlock.
+- Moved CleanupGdiResources to CleanupAndExit instead of WM_CLOSE.
+- Added check for trailing characters after IP address in connection dialog.
+- Added check of GetDefaultIP result.
+- Enlarged SendLeaveMessage buffer to 2048 bytes.
+- Removed main_window_ready from StartClient and StartServer.
+- Removed drain-cycle from SendCurrentMessage.
+- Added more WideCharToMultiByte and malloc checks.
+- Fixed UTF-8 truncation on multibyte boundaries.
+- Moved closesocket after WaitForSingleObject (thread-safe socket close).
+- Replaced direct network-to-UI calls with window message proxy.
+- Replaced "msg length > buffer" with "msg length >= buffer".
+- Fixed double CleanupAndExit call.
+- Removed unused stdbool.h header.
+- Removed 3-attempt error counter in LogMessage.
+- Removed unused hWnd parameter from SendCurrentMessage and HandleSendCommand.
+- Removed unused _endthread and arg from ReceiveMessages.
+- Marked proxy functions as static (internal to quickchat.c).
+- Cleaned up unused prototypes.
+- Disabled strict aliasing.
+- Replaced log write error with MessageBox.
+
+Build script updates:
+1. Added check of /clean before running /nocleankey.
+2. Added centralized list of build artifacts, compiler, libs, parameters, etc.
+3. Added delayed expansion of variables.
+4. Added loading PowerShell without profile.
+
+**QuickChat (11 October 2026)**:
 - Changed Send button text size to 9pt.
 - Separated sendling leave message to separate function.
 - Added arrow cursor over disabled controls.
