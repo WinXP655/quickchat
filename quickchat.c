@@ -78,7 +78,7 @@ BOOL confirm_enabled = TRUE;
 // ----- Network -----
 SOCKET client_socket = INVALID_SOCKET;
 HANDLE hReceiveThread = NULL;
-wchar_t local_ip[16] = L"127.0.0.1";
+wchar_t local_ip[16] = L"";
 wchar_t remote_ip[16] = L"";
 wchar_t remote_name[256] = L"";
 wchar_t computer_name[256] = L"";
@@ -100,7 +100,6 @@ HINSTANCE hInstGlobal = NULL;
 
 // ----- Thread sync -----
 volatile LONG is_running = TRUE;
-volatile BOOL main_window_ready = FALSE;
 
 // ======= 4. Prototypes =======
 // ----- Infrastructure -----
@@ -299,8 +298,8 @@ void LogMessage(const wchar_t* message) {
 		DWORD err = GetLastError();
 
 		wchar_t err_msg[512];
-		swprintf(err_msg, sizeof(err_msg) / sizeof(wchar_t), L"Failed to write to log. Error: %lu.\nLogging will be disabled for this session.", err);
-		MessageBoxW(NULL, err_msg, L"QuickChat", MB_OK | MB_ICONWARNING);
+		swprintf(err_msg, sizeof(err_msg) / sizeof(wchar_t), L"[ERROR]: Failed to write to log. Error: %lu. Logging will be disabled for this session.", err);
+		AddMessage(err_msg);
 
 		logging_enabled = FALSE;
 		CloseHandle(chat_log);
@@ -471,7 +470,7 @@ void ResetSettings(HWND hWnd) {
 
 		SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
-		MessageBoxW(hWnd, L"Settings have been reset to default values.", L"QuickChat", MB_OK | MB_ICONINFORMATION);
+		AddMessage(L"[INFO]: Settings have been reset to default values.");
 	}
 }
 
@@ -613,7 +612,7 @@ void SendLeaveMessage(void) {
 	AddMessage(leave_msg);
 	if (is_server) LogMessage(leave_msg);
 
-	if (client_socket != INVALID_SOCKET && is_running) {
+	if (client_socket != INVALID_SOCKET && InterlockedCompareExchange(&is_running, 1, 1)) {
 		char utf8_msg[2048];
 		WideCharToMultiByte(CP_UTF8, 0, leave_msg, -1, utf8_msg, sizeof(utf8_msg), NULL, NULL);
 		int msg_len = strlen(utf8_msg);
@@ -755,7 +754,7 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	if (!GetDefaultIP(local_ip, sizeof(local_ip) / sizeof(wchar_t))) {
-		wcscpy(local_ip, L"<no LAN route>");
+		wcscpy(local_ip, L"<No LAN route>");
 		LogMessage(L"[WARNING]: Could not detect LAN IP; using placeholder.");
 	}
 
@@ -770,7 +769,8 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 		return FALSE;
 	}
 
-	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ShowServerIPMessage, NULL, 0, NULL);
+	HANDLE hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ShowServerIPMessage, NULL, 0, NULL);
+	if (hThread) CloseHandle(hThread);
 
 	while (1) {
 		struct sockaddr_in client_addr;
@@ -848,7 +848,12 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 		strncpy(ip_utf8, inet_ntoa(client_addr.sin_addr), 15);
 		ip_utf8[15] = '\0';
 		MultiByteToWideChar(CP_UTF8, 0, ip_utf8, -1, remote_ip, sizeof(remote_ip) / sizeof(wchar_t));
-		MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, remote_name, sizeof(remote_name) / sizeof(wchar_t));
+
+		int wlen = MultiByteToWideChar(CP_UTF8, 0, name_ptr, -1, remote_name, sizeof(remote_name) / sizeof(wchar_t));
+		if (wlen <= 0 || remote_name[0] == L'\0') {
+			wcscpy(remote_name, L"<Unknown>");
+			LogMessage(L"[SECURITY]: Invalid peer name. Using placeholder.");
+		}
 		break;
 	}
 
@@ -857,6 +862,7 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 	char hs_reply[256];
 	int pos = snprintf(hs_reply, sizeof(hs_reply), "%s", QC_LABEL);
 	WideCharToMultiByte(CP_UTF8, 0, computer_name, -1, hs_reply + pos, sizeof(hs_reply) - pos, NULL, NULL);
+
 	int hs_r_len = strlen(hs_reply);
 	XorObf((unsigned char*)hs_reply, hs_r_len);
 	send(client_socket, hs_reply, hs_r_len, 0);
@@ -978,8 +984,7 @@ unsigned int __stdcall ReceiveMessages(void*) {
 
 	while (InterlockedCompareExchange(&is_running, 1, 1) != 0) {
 		int bytes = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
-		if (!is_running)
-			break;
+		if (InterlockedCompareExchange(&is_running, 1, 1) == 0) break;
 
 		if (bytes == SOCKET_ERROR) {
 			int err_code = WSAGetLastError();
@@ -1065,11 +1070,22 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 	RegisterClassW(&wc);
 
 	wchar_t title[512];
-	swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat - %ls", remote_name);
+	if (remote_name[0] != L'\0') {
+		swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat - %ls", remote_name);
+	} else {
+		wcscpy(title, L"QuickChat - <No name>");
+	}
+
+	HDC hdc = GetDC(NULL);
+	int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
+	ReleaseDC(NULL, hdc);
+
+	int width = MulDiv(600, dpi, 96);
+	int height = MulDiv(395, dpi, 96);
 
 	HWND hWnd = CreateWindowW(L"QuickChatWndClass", title,
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX,
-		CW_USEDEFAULT, CW_USEDEFAULT, 600, 395,
+		CW_USEDEFAULT, CW_USEDEFAULT, width, height,
 		NULL, NULL, hInstance, NULL);
 
 	if (!hWnd) {
@@ -1089,7 +1105,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		case WM_CREATE:
 			CreateAppFonts(hWnd);
 			CreateAppControls(hWnd);
-			main_window_ready = TRUE;
 			return 0;
 
 		case WM_COMMAND: {
@@ -1216,8 +1231,8 @@ void CreateAppControls(HWND hWnd) {
 	SendMessageW(hMsgDisplay, WM_SETFONT, (WPARAM)hFont, TRUE);
 	SendMessageW(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
 	SendMessageW(hSendBtn, WM_SETFONT, (WPARAM)hFontBold, TRUE);
-	SendMessageW(hEdit, EM_SETLIMITTEXT, BUFFER_SIZE - 1, 0);
 
+	SendMessageW(hEdit, EM_SETLIMITTEXT, BUFFER_SIZE - 1, 0);
 	oldEditProc = (WNDPROC)SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)EditProc);
 	oldDisplayProc = (WNDPROC)SetWindowLongPtrW(hMsgDisplay, GWLP_WNDPROC, (LONG_PTR)EditProc);
 	DragAcceptFiles(hWnd, TRUE);
@@ -1660,13 +1675,13 @@ void SaveChatToFile(HWND hWnd) {
 	int len = GetWindowTextLengthW(hMsgDisplay);
 	wchar_t *chat_text = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
 	if (!chat_text) {
-		MessageBoxW(hWnd, L"Cannot save chat: Out of memory.", L"QuickChat", MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Failed to save chat history: Out of memory.", L"QuickChat", MB_OK | MB_ICONERROR);
 		return;
 	}
+
 	GetWindowTextW(hMsgDisplay, chat_text, len + 1);
 
 	HANDLE hFile = CreateFileW(filename, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-
 	if (hFile != INVALID_HANDLE_VALUE) {
 		int utf8_len = WideCharToMultiByte(CP_UTF8, 0, chat_text, -1, NULL, 0, NULL, NULL);
 		if (utf8_len > 0) {
@@ -1677,15 +1692,15 @@ void SaveChatToFile(HWND hWnd) {
 				DWORD bytes_written;
 				if (WriteFile(hFile, utf8, utf8_len - 1, &bytes_written, NULL)) {
 					wchar_t save_msg[512];
-					swprintf(save_msg, sizeof(save_msg) / sizeof(wchar_t), L"Chat saved to %ls", filename);
-					MessageBoxW(hWnd, save_msg, L"QuickChat", MB_OK | MB_ICONINFORMATION);
+					swprintf(save_msg, sizeof(save_msg) / sizeof(wchar_t), L"[INFO]: Chat saved to %ls.", filename);
+					AddMessage(save_msg);
 				} else {
 					ShowError(L"Failed to save chat history", GetLastError());
 				}
 
 				free(utf8);
 			} else {
-				MessageBoxW(hWnd, L"Cannot save chat: Out of memory.", L"QuickChat", MB_OK | MB_ICONERROR);
+				MessageBoxW(hWnd, L"Failed to save chat history: Out of memory.", L"QuickChat", MB_OK | MB_ICONERROR);
 			}
 		}
 
@@ -1808,14 +1823,14 @@ wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	DWORD size = GetFileSize(hFile, NULL);
 	if (size == 0 || size == INVALID_FILE_SIZE) {
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"This file is empty.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"Empty files cannot be dropped.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
 	char *ansi = (char*)malloc(size + 1);
 	if (!ansi) {
 		CloseHandle(hFile);
-		MessageBoxW(hWnd, L"Out of memory: cannot read file.", L"QuickChat", MB_OK | MB_ICONERROR);
+		MessageBoxW(hWnd, L"Failed to read file: Out of memory.", L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
 
@@ -1836,12 +1851,16 @@ wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 		bom_offset = 3;
 	}
 
+	UINT cp = CP_UTF8;
+	int offset = bom_offset;
 	int wide_len = MultiByteToWideChar(CP_UTF8, 0, ansi + bom_offset, -1, NULL, 0);
 	if (wide_len <= 0) {
-		wide_len = MultiByteToWideChar(CP_ACP, 0, ansi, -1, NULL, 0);
+		cp = CP_ACP;
+		offset = 0;
+		wide_len = MultiByteToWideChar(cp, 0, ansi, -1, NULL, 0);
 		if (wide_len <= 0) {
 			free(ansi);
-			MessageBoxW(hWnd, L"Cannot decode file.", L"QuickChat", MB_OK | MB_ICONWARNING);
+			MessageBoxW(hWnd, L"Failed to decode the file.", L"QuickChat", MB_OK | MB_ICONWARNING);
 			return NULL;
 		}
 	}
@@ -1849,11 +1868,11 @@ wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	wchar_t *wide = (wchar_t*)malloc(wide_len * sizeof(wchar_t));
 	if (!wide) {
 		free(ansi);
-		MessageBoxW(hWnd, L"Cannot read file: Out of memory.", L"QuickChat", MB_OK | MB_ICONWARNING);
+		MessageBoxW(hWnd, L"Failed to read file: Out of memory.", L"QuickChat", MB_OK | MB_ICONWARNING);
 		return NULL;
 	}
 
-	MultiByteToWideChar(CP_UTF8, 0, ansi + bom_offset, -1, wide, wide_len);
+	MultiByteToWideChar(cp, 0, ansi + offset, -1, wide, wide_len);
 	free(ansi);
 
 	return wide;

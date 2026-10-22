@@ -27,18 +27,17 @@ if %NOCLEANKEY%==1 if %CLEAN%==0 (
 
 if %HELP%==1 (
     echo QuickChat Build Environment
-    echo This script is used to build QuickChat with different configurations.
     echo.
-    echo Supported arguments:
-    echo build.bat [/help] [/clean] [/minbuild] [/rekey] [/pack]
+    echo build.bat [options]
     echo.
-    echo /help       - Show this help.
-    echo /clean      - Delete existing compiled files.
-    echo /minbuild   - Compile QuickChat with minimal configuration.
-    echo /rekey      - Regenerate XOR key.
-    echo /pack       - Pack compiled binary into ZIP archive.
-    echo /nocleankey - Do not delete key file. Can be used only with /clean.
-    goto end
+    echo Options:
+    echo   /help       Show this help.
+    echo   /clean      Delete build artifacts and runtime files.
+    echo   /rekey      Regenerate XOR key ^(key.h^).
+    echo   /pack       Create compressed package.
+    echo   /minbuild   Minimal build ^(no resources, no pack^).
+    echo   /nocleankey Keep key.h while cleaning ^(only with /clean^)
+    goto :end
 )
 
 echo Build parameters: Clean=%CLEAN% MinBuild=%MINBUILD% ReKey=%REKEY% Pack=%PACK% NoCleanKey=%NOCLEANKEY%
@@ -50,31 +49,51 @@ set ARCH_FLAGS=-m32 -municode
 set COMMON_LIBS=-lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32
 set COMMON_WARN=-Wall -Wextra
 set CFLAGS_FULL=-Os -s -ffunction-sections -fdata-sections -fno-strict-aliasing -mwindows -Wl,--gc-sections
-set ARTIFACTS=about.o compinfo.o hostinfo.o resources.o servconn.o start.o chatlog.txt quickchat.ini quickchat.exe QuickChat.zip
+set BUILD_ARTIFACTS=about.o compinfo.o hostinfo.o resources.o servconn.o start.o quickchat.exe QuickChat.zip
+set RUNTIME_ARTIFACTS=chatlog.txt quickchat.ini Chat-*.txt
 
 if %CLEAN%==1 (
-    for %%F in (%ARTIFACTS%) do (
-        if exist %%F del %%F
+    echo Cleaning build artifacts...
+    for %%F in (%BUILD_ARTIFACTS%) do (
+        if exist "%%F" del /f /q "%%F" >nul 2>&1
     )
-    if %NOCLEANKEY%==0 if exist key.h del key.h
+
+    echo Cleaning runtime artifacts...
+    for %%F in (%RUNTIME_ARTIFACTS%) do (
+        if exist "%%F" del /f /q "%%F" >nul 2>&1
+    )
+
+    del /f /q Chat-*.txt >nul 2>&1
+
+    echo Cleaning key... ^(Skipped with /nocleankey^)
+    if %NOCLEANKEY%==0 if exist key.h del /f /q key.h >nul 2>&1
     echo [OK] Done cleaning
-    goto end
+    goto :end
 )
 
 if %MINBUILD%==1 (
     if not exist minbuildconn.o (
         echo [ERROR] minbuildconn.o is not found.
-        goto end
+        goto :build_failed
     )
-    if not exist key.h python keygen.py
+
+    if not exist key.h (
+        python keygen.py 32
+        if errorlevel 1 goto :build_failed
+        if not exist key.h goto :build_failed
+    )
+
     if not exist start.o %WINDRES% %WINDRES_TARGET% start.rc -o start.o || goto :build_failed
     if not exist hostinfo.o %WINDRES% %WINDRES_TARGET% hostinfo.rc -o hostinfo.o || goto :build_failed
+
     %CC% quickchat.c minbuildconn.o start.o hostinfo.o -o quickchat.exe %ARCH_FLAGS% %COMMON_LIBS% %COMMON_WARN% || goto :build_failed
-    echo Done.
-    goto end
+    echo [OK] Minimal build successful: quickchat.exe
+    goto :end
 )
 
-for %%F in (%ARTIFACTS%) do (
+echo Build type: Release
+
+for %%F in (%BUILD_ARTIFACTS%) do (
     if exist "%%F" set PREVBLD=1
 )
 if !PREVBLD!==1 echo [WARN] Previous build files detected. Run "build.bat /clean" first.
@@ -96,11 +115,11 @@ if not exist key.h (
     echo [OK] key.h exists, skipping generation ^(use build /rekey to generate new^)
 )
 
-echo Building dialog - Connect to Host...
-%WINDRES% %WINDRES_TARGET% -c 65001 servconn.rc -o servconn.o || goto :build_failed
-
 echo Building dialog - Main...
 %WINDRES% %WINDRES_TARGET% -c 65001 start.rc -o start.o || goto :build_failed
+
+echo Building dialog - Host Connect...
+%WINDRES% %WINDRES_TARGET% -c 65001 servconn.rc -o servconn.o || goto :build_failed
 
 echo Building dialog - Host Info...
 %WINDRES% %WINDRES_TARGET% -c 65001 hostinfo.rc -o hostinfo.o || goto :build_failed
