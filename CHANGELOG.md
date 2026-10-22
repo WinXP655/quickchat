@@ -1,6 +1,24 @@
 ## Public Releases
 
-**QuickChat (Current, 17 October 2026)**:
+**QuickChat (Current, 22 October 2026)**:
+- Removed unused main_window_ready flag.
+- Replaced MessageBox call with AddMessage in SaveChatToFile, ResetSettings.
+- Changed "Out of memory" error texts.
+- Replaced direct compare of is_running with InterlockedCompareExchange.
+- Fixed UTF-8 to ANSI fallback.
+- Added checking for name length for title bar display.
+- Replaced MessageBox call in LogMessage with AddMessage.
+- Added closing host IP thread handle.
+- Replaced 127.0.0.1 with \<No LAN route\> when UDP method failed.
+- Added \<Unknown\> name replacement when failed to decode remote name.
+
+Build script updates:
+- Separated build and runtime artifacts.
+- Unified MinBuild and Release style.
+- Shortened build script.
+- Added showing build type.
+
+**QuickChat (17 October 2026)**:
 - Removed unused GetTickCount64 (was breaking XP/2000 IAT compatibility).
 - Added ResetSettings resetting confirmation toggle.
 - Rearranged functions by domain.
