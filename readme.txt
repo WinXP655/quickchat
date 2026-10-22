@@ -19,7 +19,7 @@ No major features are planned.
 6. Extracting text from text files by just drag-and-drop.
 
 - Requirements
-OS - Windows 2000 and newer.
+OS - Windows Vista and newer.
 
 - How to use
 
