@@ -8,6 +8,7 @@ start.o
 about.o
 compinfo.o
 hostinfo.o
+minbuildconn.o
 
 # QCS Key
 key.h
