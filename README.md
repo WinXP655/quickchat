@@ -35,30 +35,14 @@ No major features are planned.
 3. Enter the Host IP address in the connection window and click Connect.
 4. Verify protocol settings (XOR must match the host's configuration).
 
+> **Note:** All logs and history are stored locally. Neither side uploads or transmits chat history anywhere.
+
 ## Logging
 Logging is disabled by default. 
 - **Host:** Can save the full session history (messages, timestamps, connection IPs) to a local file.
 - **Client:** Can dump the current chat history to a file at any time.
 
 Nothing is sent to the cloud. Everything is stored locally.
-
-## Protocol
-QuickChat uses a custom TCP-based protocol. The base protocol is **QC (QuickChat Plaintext)**. 
-
-### Handshake Flow
-1. **Client initiates:** The host stays silent until it receives a valid handshake.
-2. **Client sends:** `QC:PCNAME\0`
-   - `PCNAME` is the sender's computer name (or any custom name).
-   - `\0` is the null-terminator, required for C-string compatibility.
-3. **Host responds:** `QC:HOSTNAME\0` (in the same format).
-4. **Chat starts:** Both sides can now exchange text messages.
-
-### XOR Obfuscation (Optional)
-If XOR is enabled, **all** transmitted data (including the handshake) is XORed before sending and decoded upon receipt. 
-- The first 3 bytes must always be `QC:` (or its XORed equivalent). The host drops any connection that fails this check.
-- **Error messages:** If a handshake fails (e.g., malformed packet or invalid prefix), the host closes the connection. Error responses (`QCERR: ...`) are sent in plain text **only when XOR is disabled**. If XOR is enabled, the server drops the connection silently to prevent sending XORed garbage that the client cannot parse.
-
-> **Note:** All logs and history are stored locally. Neither side uploads or transmits chat history anywhere.
 
 ## Use сases
 - **Quick 1-to-1 chat in a local network**: No server, no accounts, no setup.
@@ -74,9 +58,10 @@ Read CHANGELOG.md.
 ## Building from source
 
 ### Requirements
-- **MinGW-w64** compiler
-- **Python** any version
+- **MinGW** compiler
+- **Python** (any version)
 - **Windows** (7/10/11 recommended for build tools)
+- **PowerShell**
 
 ### Included tools
 - `7z.exe` - packaging.
@@ -116,6 +101,22 @@ Build script provide 2 types of compiled binary:
    `build.bat /clean` - Delete existing compiled files.\
    `build.bat /clean /nocleankey` - Delete existing compiled files, but do not delete key file.
    `build.bat /minbuild /rekey` - Compile QuickChat with most minimal configuration and regerenate key
+
+## Protocol
+QuickChat uses a custom TCP-based protocol. The base protocol is **QC (QuickChat Plaintext)**. 
+
+### Handshake Flow
+1. **Client initiates:** The host stays silent until it receives a valid handshake.
+2. **Client sends:** `QC:PCNAME\0`
+   - `PCNAME` is the sender's computer name (or any custom name).
+   - `\0` is the null-terminator, required for C-string compatibility.
+3. **Host responds:** `QC:HOSTNAME\0` (in the same format).
+4. **Chat starts:** Both sides can now exchange text messages.
+
+### XOR Obfuscation (Optional)
+If XOR is enabled, **all** transmitted data (including the handshake) is XORed before sending and decoded upon receipt. 
+- The first 3 bytes must always be `QC:` (or its XORed equivalent). The host drops any connection that fails this check.
+- **Error messages:** If a handshake fails (e.g., malformed packet or invalid prefix), the host closes the connection. Error responses (`QCERR: ...`) are sent in plain text **only when XOR is disabled**. If XOR is enabled, the server drops the connection silently to prevent sending XORed garbage that the client cannot parse.
 
 ## Credits
 This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
