@@ -90,10 +90,6 @@ if %REKEY%==1 (
 if %MINBUILD%==1 (
 	echo Build type: MinBuild
 	echo.
-	if not exist minbuildconn.o (
-		echo [ERROR] minbuildconn.o is not found.
-		goto :build_failed
-	)
 
 	if not exist key.h (
 		python keygen.py 32
