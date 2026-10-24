@@ -1,6 +1,7 @@
 # Compiled files
 QuickChat.zip
 quickchat.exe
+quickchat_minbuild.exe
 resources.o
 servconn.o
 start.o
