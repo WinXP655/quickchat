@@ -1,6 +1,41 @@
 ## Public Releases
 
-**QuickChat (Current, 22 October 2026)**:
+**QuickChat (Current, 24 October 2026)**:
+- Changed strings a bit.
+- Removed legacy MinBuild connection dialog.
+- Replaced magic numbers with defines.
+- Added converting to UTF-8 to crash handler.
+- Removed unnecessary malloc in InitializeLog.
+- Enlarged logging buffer.
+- Removed separate socket for UDP hack.
+- Replaced memset in XOR obfuscation with SecureZeroMemory.
+- Removed redundant buffer copies and memcpy in SendLeaveMessage and SendCurrentMessage.
+- Removed redunant WSACleanup calls in StartServer.
+- Replaced snprintf with strcpy for protocol label to avoid unnecessary format parsing.
+- Extracted UTF-8 truncation into separate TrimIncompleteUTF8.
+- Replaced hardcoded window size with DEFAULT_WIN_WIDTH and DEFAULT_WIN_HEIGHT macros.
+- Restricted WM_COMMAND to handle only menu IDs to prevent false triggers.
+- Fixed CheckMenuItem calls to use the correct submenu handles.
+- Simplified leave confirmation logic in HandleMenuCommand.
+- Fixed EditProc to properly ignore Enter in the read-only message display.
+- Simplified WM_CHAR handling in EditProc.
+- Refactored ModeSelectProc command handling to use switch and explicit BN_CLICKED checks.
+- Extracted IP validation from ConnectDialogProc into a separate ValidateAndSetIP.
+- Fixed hHostInfoDlg not being reset to NULL when the dialog is closed.
+- Replaced swprintf for errors with ShowError in SaveChatToFile.
+- Simplified condition checks in ProcessDroppedFile.
+- Replaced long list of compare with static array in IsValidTextExtension.
+- Removed rarely used extensions from supported for drop: css, htm, html, toml, cfg, conf.
+- Added spacing for readability in ReadTextFileContent.
+
+Build script updates:
+- Added showing hash for executable when no /pack key specified.
+- Resources file (version info, manifest, icon) now compiled as Unicode.
+- Renamed MinBuild to quickchat_minbuild.exe to prevent overwriting.
+- /rekey flag now compatible with MinBuild.
+- Added section markers.
+
+**QuickChat (22 October 2026)**:
 - Removed unused main_window_ready flag.
 - Replaced MessageBox call with AddMessage in SaveChatToFile, ResetSettings.
 - Changed "Out of memory" error texts.
