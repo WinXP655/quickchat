@@ -14,7 +14,7 @@ No major features are planned.
 1. **Portable** - just 1 .exe file
 2. **Unicode Support** - any languages, any symbols.
 3. **QC (QuickChat)** protocol with optional XOR.
-4. **Logging** - save chat history and events. Only for Server, disabled by default.
+4. **Logging** - save chat history and events. Only for host, disabled by default.
 5. **Tiny Size** - just 150 KB.
 6. **Drag-and-Drop** - drag-and-drop any compatible text file and it will extract text instantly.
 
