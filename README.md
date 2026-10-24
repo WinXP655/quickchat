@@ -40,7 +40,7 @@ Full chat log stored only on host side and do not contain sensitive information.
 1. Session start and end.
 2. User messages with timestamps.
 3. System messages and events.
-4. Where server set port binding.
+4. Where host set port binding.
 5. Who connected (computer name and LAN IP).
 
 For client, added option to save just chat history:
@@ -69,6 +69,8 @@ It uses a very simple custom protocol. The base protocol is QuickChat Plaintext 
 ## Changelog
 Read CHANGELOG.md.
 
+---
+
 ## Building from source
 
 ### Requirements
@@ -77,18 +79,34 @@ Read CHANGELOG.md.
 - **Windows** (7/10/11 recommended for build tools)
 
 ### Included tools
-- 7z.exe - packaging.
-- keygen.py - XOR key generator.
-- keygen_fixed.py - XOR key generator, but with your own key.
-- build.bat - build script.
+- `7z.exe` - packaging.
+- `keygen.py` - XOR key generator.
+- `keygen_fixed.py` - XOR key generator, but with your own key.
+- `build.bat` - build script.
+
+### Build types
+Build script provide 2 types of compiled binary:
+
+- **Release**:
+  - **Purpose**: Ready for distribution application.
+  - **Includes**: All user interface dialogs, manifest, resources, icon, full optimization.
+  - **Size**: 150 KB/
+  - **Usage**: `build.bat` without args or `/pack` to create ZIP distribution.
+- **MinBuild**:
+  - **Purpose**: Quick and dirty compilation for fast test of features or code.
+  - **Includes**: Only core resources. About, Computer Info dialogs, icons, manifest are removed.
+  - **Optimization**: Disabled.
+  - **Size**: 180-200 KB (larger because of debug symbols and no optimization).
+  - **Usage**: `build.bat /minbuild`\
+  *Note: It produce a binary with different name to do not overwrite release binary*
 
 ### Steps
 1. Clone or download a repository
-2. Make sure `gcc`, `windres`, and `python` are available in PATH.
+2. Make sure `gcc`, `windres`, and `python` are available in system `PATH`.
 3. Open a command prompt in the project folder.
-4. If you want to define your own key before, run:\
+4. (Optional) If you want to define your own key before, run:\
    `python keygen_fixed.py <your own key>`\
-   If you want to make your build compatible with official host, copy QCS key string from release.
+   *Note: To ensure compatibility with official releases, use key specified in release you are targeting for.*
 6. Run depending on what you need:\
    `build.bat` - Compile QuickChat without changing key and packing.\
    `build.bat /rekey` - Compile QuickChat and regenerate key without packing.\
@@ -97,6 +115,7 @@ Read CHANGELOG.md.
    `build.bat /minbuild` - Compile QuickChat with most minimal configuration.\
    `build.bat /clean` - Delete existing compiled files.\
    `build.bat /clean /nocleankey` - Delete existing compiled files, but do not delete key file.
+   `build.bat /minbuild /rekey` - Compile QuickChat with most minimal configuration and regerenate key
 
 ## Credits
 This project uses [7-Zip](https://www.7-zip.org/) for archiving.  
