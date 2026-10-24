@@ -36,29 +36,29 @@ No major features are planned.
 4. Verify protocol settings (XOR must match the host's configuration).
 
 ## Logging
-Full chat log stored only on host side and do not contain sensitive information. It only logs:
-1. Session start and end.
-2. User messages with timestamps.
-3. System messages and events.
-4. Where host set port binding.
-5. Who connected (computer name and LAN IP).
+Logging is disabled by default. 
+- **Host:** Can save the full session history (messages, timestamps, connection IPs) to a local file.
+- **Client:** Can dump the current chat history to a file at any time.
 
-For client, added option to save just chat history:
-1. Connection
-2. Save Chat
+Nothing is sent to the cloud. Everything is stored locally.
 
 ## Protocol
-It uses a very simple custom protocol. The base protocol is QuickChat Plaintext (QC).
-1. Who starts first: Client. Host never sends anything until it will be QC handshake.
-2. Client sends handshake in following format: QC:PCNAME\0.
-   Replace PCNAME with your computer name or what you want remote side to see.\
-   "\0" is required - official backend written on C, meaning you have to follow C rules.\
-   If you are using XOR, you need to XOR everything before.\
-   First 3 bytes should be exactly "QC:" or XORed version of it. Host reject if it is non-QC or at least 1 byte is wrong.
-3. Host send its name in same format.
-4. Chat starts.
+QuickChat uses a custom TCP-based protocol. The base protocol is **QC (QuickChat Plaintext)**. 
 
-> Host and client side can delete logs/history at any time, it is stored only locally.
+### Handshake Flow
+1. **Client initiates:** The host stays silent until it receives a valid handshake.
+2. **Client sends:** `QC:PCNAME\0`
+   - `PCNAME` is the sender's computer name (or any custom name).
+   - `\0` is the null-terminator, required for C-string compatibility.
+3. **Host responds:** `QC:HOSTNAME\0` (in the same format).
+4. **Chat starts:** Both sides can now exchange text messages.
+
+### XOR Obfuscation (Optional)
+If XOR is enabled, **all** transmitted data (including the handshake) is XORed before sending and decoded upon receipt. 
+- The first 3 bytes must always be `QC:` (or its XORed equivalent). The host drops any connection that fails this check.
+- **Error messages:** If a handshake fails (e.g., malformed packet or invalid prefix), the host closes the connection. Error responses (`QCERR: ...`) are sent in plain text **only when XOR is disabled**. If XOR is enabled, the server drops the connection silently to prevent sending XORed garbage that the client cannot parse.
+
+> **Note:** All logs and history are stored locally. Neither side uploads or transmits chat history anywhere.
 
 ## Use сases
 - **Quick 1-to-1 chat in a local network**: No server, no accounts, no setup.
