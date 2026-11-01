@@ -1,6 +1,16 @@
 ## Public Releases
 
-**QuickChat (Current, 24 October 2026)**:
+**QuickChat (Current, 1 November 2026)**:
+- Added check for exception info in CrashHandler.
+- Replaced Windows 2000 requirement to Windows Vista in readme file.
+- Added check for UTF-8 conversion in LogMessage.
+- Fixed playing default beep while using Ctrl+A.
+
+Build script updates:
+- Removed unused Debug flag from build script.
+- Added warning when /pack used with /minbuild.
+
+**QuickChat (24 October 2026)**:
 - Changed strings a bit.
 - Removed legacy MinBuild connection dialog.
 - Replaced magic numbers with defines.
