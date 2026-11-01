@@ -2,7 +2,7 @@
 
 QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
 Does not require installation, leaves no traces, and works on any version starting
-from Windows 2000 up to 11.
+from Windows Vista up to 11.
 
 Based on MicroChat Framework (https://github.com/WinXP655/microchat).
 

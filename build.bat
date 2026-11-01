@@ -41,7 +41,7 @@ if %HELP%==1 (
 	goto :end
 )
 
-echo Build parameters: Clean=%CLEAN% MinBuild=%MINBUILD% ReKey=%REKEY% Pack=%PACK% NoCleanKey=%NOCLEANKEY% Debug=%DEBUG%
+echo Build parameters: Clean=%CLEAN% MinBuild=%MINBUILD% ReKey=%REKEY% Pack=%PACK% NoCleanKey=%NOCLEANKEY%
 
 :: Config: Tools
 set CC=gcc
@@ -90,6 +90,11 @@ if %REKEY%==1 (
 if %MINBUILD%==1 (
 	echo Build type: MinBuild
 	echo.
+
+	if !PACK!==1 (
+		echo [WARN] /pack is not compatible with /minbuild. Ignoring /pack.
+		set PACK=0
+	)
 
 	if not exist key.h (
 		python keygen.py 32

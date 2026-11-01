@@ -220,19 +220,24 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 // ======= 6. Infrastructure =======
 LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
-	DWORD code = ExceptionInfo->ExceptionRecord->ExceptionCode;
-	void* address = ExceptionInfo->ExceptionRecord->ExceptionAddress;
+	DWORD code = 0;
+	void* address = NULL;
 
-	wchar_t user_msg[512];
-	swprintf(user_msg, sizeof(user_msg) / sizeof(wchar_t),
+	if (ExceptionInfo && ExceptionInfo->ExceptionRecord) {
+		code = ExceptionInfo->ExceptionRecord->ExceptionCode;
+		address = ExceptionInfo->ExceptionRecord->ExceptionAddress;
+	}
+
+	wchar_t crash_msg[512];
+	swprintf(crash_msg, sizeof(crash_msg) / sizeof(wchar_t),
 		L"A critical error has occurred.\n"
 		L"Error code: 0x%08lX\n"
 		L"Address: %p\n\n"
 		L"Click OK to exit QuickChat",
 		code, address);
-	MessageBoxW(NULL, user_msg, L"QuickChat", MB_OK | MB_ICONERROR);
+	MessageBoxW(NULL, crash_msg, L"QuickChat", MB_OK | MB_ICONERROR);
 
-	HANDLE hCrashLog = CreateFileW(CRASHLOG_FILE, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hCrashLog = CreateFileW(CRASHLOG_FILE, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	if (hCrashLog != INVALID_HANDLE_VALUE) {
 		time_t current = time(NULL);
@@ -292,10 +297,12 @@ void LogMessage(const wchar_t* message) {
 		st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 
 	char msg_utf8[2048];
-	WideCharToMultiByte(CP_UTF8, 0, message, -1, msg_utf8, sizeof(msg_utf8), NULL, NULL);
+	int utf8_len = WideCharToMultiByte(CP_UTF8, 0, message, -1, msg_utf8, sizeof(msg_utf8), NULL, NULL);
+	if (utf8_len <= 0) return;
 
 	char buffer[4096];
 	int len = snprintf(buffer, sizeof(buffer), "[%s] %s\r\n", timestamp, msg_utf8);
+	if (len <= 0 || len >= (int)sizeof(buffer)) return;
 
 	DWORD bytes_written;
 	if (!WriteFile(chat_log, buffer, len, &bytes_written, NULL)) {
@@ -591,7 +598,7 @@ void SendLeaveMessage(void) {
 	if (client_socket != INVALID_SOCKET && InterlockedCompareExchange(&is_running, 1, 1)) {
 		char encbuf[2048];
 		int msg_len = WideCharToMultiByte(CP_UTF8, 0, leave_msg, -1, encbuf, sizeof(encbuf), NULL, NULL);
-		
+
 		if (msg_len > 0) {
 			XorObf((unsigned char*)encbuf, msg_len - 1);
 			send(client_socket, encbuf, msg_len - 1, 0);
@@ -631,10 +638,10 @@ void SendCurrentMessage(void) {
 	if (len > 0) {
 		wchar_t full_msg[BUFFER_SIZE + 128];
 		swprintf(full_msg, sizeof(full_msg) / sizeof(wchar_t), L"[%ls]: %ls", computer_name, start);
-		
+
 		char encbuf[BUFFER_SIZE + 128];
 		int msg_len = WideCharToMultiByte(CP_UTF8, 0, full_msg, -1, encbuf, sizeof(encbuf), NULL, NULL);
-		
+
 		if (msg_len > 1) {
 			XorObf((unsigned char*)encbuf, msg_len - 1);
 			AddMessage(full_msg);
@@ -1194,7 +1201,7 @@ void CreateAppControls(HWND hWnd) {
 
 	oldEditProc = (WNDPROC)SetWindowLongPtrW(hEdit, GWLP_WNDPROC, (LONG_PTR)EditProc);
 	oldDisplayProc = (WNDPROC)SetWindowLongPtrW(hMsgDisplay, GWLP_WNDPROC, (LONG_PTR)EditProc);
-	
+
 	DragAcceptFiles(hWnd, TRUE);
 }
 
@@ -1307,8 +1314,12 @@ void HandleMenuCommand(HWND hWnd, int id) {
 
 LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	WNDPROC oldProc = (hWnd == hEdit) ? oldEditProc : oldDisplayProc;
-	
+
 	if (uMsg == WM_CHAR) {
+		if (wParam == 1 && (GetKeyState(VK_CONTROL) & 0x8000)) {
+			return 0;
+		}
+
 		if (wParam == VK_TAB || wParam == VK_RETURN) {
 			return 0;
 		}
@@ -1329,7 +1340,7 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 			if (hNext) SetFocus(hNext);
 			return 0;
 		}
-		
+
 		if (wParam == VK_RETURN) {
 			if (hWnd == hEdit) {
 				if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
@@ -1513,7 +1524,7 @@ static BOOL ValidateAndSetIP(HWND hwnd) {
 
 INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	(void)lParam;
-	
+
 	switch (msg) {
 		case WM_INITDIALOG:
 			SetDlgItemTextW(hwnd, 1001, L"127.0.0.1");
@@ -1600,7 +1611,7 @@ INT_PTR CALLBACK ComputerInfoProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 			SetDlgItemTextW(hWnd, 102, remote_ip);
 			SetDlgItemTextW(hWnd, 103, xor_enabled ? L"Yes" : L"No");
 			SetDlgItemTextW(hWnd, 104, is_running ? L"Yes" : L"No");
-			
+
 			return TRUE;
 		}
 
@@ -1772,7 +1783,7 @@ wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 		MessageBoxW(hWnd, error_msg, L"QuickChat", MB_OK | MB_ICONERROR);
 		return NULL;
 	}
-	
+
 	ansi[read] = '\0';
 	CloseHandle(hFile);
 
@@ -1784,12 +1795,12 @@ wchar_t* ReadTextFileContent(const wchar_t *path, HWND hWnd) {
 	UINT cp = CP_UTF8;
 	int offset = bom_offset;
 	int wide_len = MultiByteToWideChar(CP_UTF8, 0, ansi + bom_offset, -1, NULL, 0);
-	
+
 	if (wide_len <= 0) {
 		cp = CP_ACP;
 		offset = 0;
 		wide_len = MultiByteToWideChar(cp, 0, ansi, -1, NULL, 0);
-		
+
 		if (wide_len <= 0) {
 			free(ansi);
 			MessageBoxW(hWnd, L"Failed to decode the file.", L"QuickChat", MB_OK | MB_ICONWARNING);
