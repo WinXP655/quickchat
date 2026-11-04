@@ -20,6 +20,7 @@ No major features are planned.
 
 ## Requirements
 - **OS** - Windows Vista and newer.
+- **Network** - Both computers should be in same network.
 
 ## How to use
 
@@ -75,7 +76,7 @@ Build script provide 2 types of compiled binary:
 - **Release**:
   - **Purpose**: Ready for distribution application.
   - **Includes**: All user interface dialogs, manifest, resources, icon, full optimization.
-  - **Size**: 150 KB/
+  - **Size**: 150 KB
   - **Usage**: `build.bat` without args or `/pack` to create ZIP distribution.
 - **MinBuild**:
   - **Purpose**: Quick and dirty compilation for fast test of features or code.
