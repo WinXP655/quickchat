@@ -2,9 +2,7 @@
 QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
 Does not require installation, leaves no traces, and works on any version starting from Windows Vista up to 11.
 
-<img width="586" height="388" alt="image" src="https://github.com/user-attachments/assets/ce0089cd-bc3b-4a9b-8f83-8d4a2015994b" />
-
-*Based on [MicroChat Framework](https://github.com/WinXP655/microchat).*
+<img width="586" height="388" alt="image" src="https://github.com/user-attachments/assets/680decdf-96c4-4b41-a108-f02bb84a15b8" />
 
 ## Project Status
 Active development is now focuses on maintenance, bug fixes and security patches.\
@@ -58,6 +56,9 @@ Read CHANGELOG.md.
 
 ## Building from source
 
+### Looking for minimal core?
+If you need just the base - a minimal chat framework to build your own project - see [MicroChat](https://github.com/WinXP655/microchat).
+
 ### Requirements
 - **MinGW** compiler
 - **Python** (any version)
@@ -103,10 +104,10 @@ Build script provide 2 types of compiled binary:
    `build.bat /clean /nocleankey` - Delete existing compiled files, but do not delete key file.
    `build.bat /minbuild /rekey` - Compile QuickChat with most minimal configuration and regerenate key
 
-## Protocol
-QuickChat uses a custom TCP-based protocol. The base protocol is **QC (QuickChat Plaintext)**. 
+### Protocol
+QuickChat uses a simple custom TCP-based protocol. The base protocol is **QC (QuickChat Plaintext)**. 
 
-### Handshake Flow
+#### Handshake Flow
 1. **Client initiates:** The host stays silent until it receives a valid handshake.
 2. **Client sends:** `QC:PCNAME\0`
    - `PCNAME` is the sender's computer name (or any custom name).
@@ -114,7 +115,7 @@ QuickChat uses a custom TCP-based protocol. The base protocol is **QC (QuickChat
 3. **Host responds:** `QC:HOSTNAME\0` (in the same format).
 4. **Chat starts:** Both sides can now exchange text messages.
 
-### XOR Obfuscation (Optional)
+#### XOR Obfuscation (Optional)
 If XOR is enabled, **all** transmitted data (including the handshake) is XORed before sending and decoded upon receipt. 
 - The first 3 bytes must always be `QC:` (or its XORed equivalent). The host drops any connection that fails this check.
 - **Error messages:** If a handshake fails (e.g., malformed packet or invalid prefix), the host closes the connection. Error responses (`QCERR: ...`) are sent in plain text **only when XOR is disabled**. If XOR is enabled, the server drops the connection silently to prevent sending XORed garbage that the client cannot parse.
