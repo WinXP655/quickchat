@@ -1,6 +1,12 @@
 ## Public Releases
 
-**QuickChat (Current, 1 November 2026)**:
+**QuickChat (Current, 6 November 2026)**:
+- Removed static style from TrimIncompleteUTF8.
+- Added WaitForSingleObject for receive thread in CleanupAndExit. Fix was ported from MicroChat.
+- Removed unneeded is_running double check in ReceiveMessages.
+- Restored IDC_IP macro.
+
+**QuickChat (1 November 2026)**:
 - Added check for exception info in CrashHandler.
 - Replaced Windows 2000 requirement to Windows Vista in readme file.
 - Added check for UTF-8 conversion in LogMessage.
