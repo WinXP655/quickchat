@@ -19,6 +19,7 @@
 // ======= 2. Defines =======
 // ----- Limits -----
 #define BUFFER_SIZE 8192
+#define THREAD_WAIT_MS 5000
 
 // ----- Files -----
 #define CHATLOG_FILE L"chatlog.txt"
@@ -49,6 +50,7 @@
 #define DEFAULT_WIN_HEIGHT 395
 
 // ----- Control IDs -----
+#define IDC_IP 1001
 #define ID_EDIT 101
 #define ID_SEND 102
 #define ID_MSG_DISPLAY 103
@@ -574,6 +576,7 @@ void CleanupAndExit(void) {
 	}
 
 	if (hReceiveThread != NULL) {
+		WaitForSingleObject(hReceiveThread, THREAD_WAIT_MS);
 		CloseHandle(hReceiveThread);
 		hReceiveThread = NULL;
 	}
@@ -932,8 +935,8 @@ unsigned int __stdcall ReceiveMessages(void*) {
 	char buffer[BUFFER_SIZE];
 
 	while (InterlockedCompareExchange(&is_running, 1, 1) != 0) {
+		// if (InterlockedCompareExchange(&is_running, 1, 1) == 0) break;
 		int bytes = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
-		if (InterlockedCompareExchange(&is_running, 1, 1) == 0) break;
 
 		if (bytes == SOCKET_ERROR) {
 			int err_code = WSAGetLastError();
@@ -965,7 +968,7 @@ unsigned int __stdcall ReceiveMessages(void*) {
 	return 0;
 }
 
-static int TrimIncompleteUTF8(const char* buffer, int bytes) {
+int TrimIncompleteUTF8(const char* buffer, int bytes) {
 	int pos = bytes;
 
 	while (pos > 0 && ((unsigned char)buffer[pos - 1] & 0xC0) == 0x80) {
@@ -1481,7 +1484,7 @@ INT_PTR CALLBACK ModeSelectProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 
 static BOOL ValidateAndSetIP(HWND hwnd) {
 	wchar_t ip[16];
-	GetDlgItemTextW(hwnd, 1001, ip, sizeof(ip) / sizeof(wchar_t));
+	GetDlgItemTextW(hwnd, IDC_IP, ip, sizeof(ip) / sizeof(wchar_t));
 
 	wchar_t* p = ip;
 	while (*p == L' ') p++;
@@ -1527,13 +1530,13 @@ INT_PTR CALLBACK ConnectDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 
 	switch (msg) {
 		case WM_INITDIALOG:
-			SetDlgItemTextW(hwnd, 1001, L"127.0.0.1");
+			SetDlgItemTextW(hwnd, IDC_IP, L"127.0.0.1");
 			return TRUE;
 
 		case WM_COMMAND:
 			if (LOWORD(wParam) == IDOK) {
 				if (!ValidateAndSetIP(hwnd)) {
-					SetFocus(GetDlgItem(hwnd, 1001));
+					SetFocus(GetDlgItem(hwnd, IDC_IP));
 					return TRUE;
 				}
 				EndDialog(hwnd, IDOK);
