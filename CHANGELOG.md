@@ -1,6 +1,10 @@
 ## Public Releases
 
-**QuickChat (Current, 6 November 2026)**:
+**QuickChat (Current, 11 November 2026)**:
+- Fixed build script not setting subsystem version to 6.0 (Vista).
+- Removed commented out double check for is_running.
+
+**QuickChat (6 November 2026)**:
 - Removed static style from TrimIncompleteUTF8.
 - Added WaitForSingleObject for receive thread in CleanupAndExit. Fix was ported from MicroChat.
 - Removed unneeded is_running double check in ReceiveMessages.
