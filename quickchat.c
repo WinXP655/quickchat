@@ -935,7 +935,6 @@ unsigned int __stdcall ReceiveMessages(void*) {
 	char buffer[BUFFER_SIZE];
 
 	while (InterlockedCompareExchange(&is_running, 1, 1) != 0) {
-		// if (InterlockedCompareExchange(&is_running, 1, 1) == 0) break;
 		int bytes = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
 
 		if (bytes == SOCKET_ERROR) {
@@ -943,7 +942,7 @@ unsigned int __stdcall ReceiveMessages(void*) {
 			if (err_code == WSAETIMEDOUT) continue;
 
 			wchar_t connlost_err[512];
-			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. (Error: %d)", err_code);
+			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. Error: %d.", err_code);
 			UIAddMessage(connlost_err);
 			if (is_server) LogMessage(connlost_err);
 

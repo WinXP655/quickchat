@@ -54,7 +54,7 @@ set COMMON_LIBS=-lcomctl32 -lgdi32 -lshell32 -lwinmm -lws2_32
 set COMMON_WARN=-Wall -Wextra
 
 :: Config: Release flags
-set CFLAGS_FULL=-Os -s -ffunction-sections -fdata-sections -fno-strict-aliasing -mwindows -Wl,--gc-sections
+set CFLAGS_FULL=-Os -s -ffunction-sections -fdata-sections -fno-strict-aliasing -mwindows -Wl,--gc-sections -Wl,--subsystem,windows:6.0
 
 :: Config: Cleanup
 set BUILD_ARTIFACTS=about.o compinfo.o hostinfo.o resources.o servconn.o start.o quickchat.exe quickchat_minbuild.exe QuickChat.zip
