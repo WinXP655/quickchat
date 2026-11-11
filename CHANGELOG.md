@@ -416,7 +416,8 @@ Note: This is last version for Windows 9x
 
 **QuickChat (31 January 2026)**:
 - Source code have funny comment:
-```// Rust devs, if you are reading this,
+```
+// Rust devs, if you are reading this,
 // try not to have a panic attack rewriting this :D
 ```
 
