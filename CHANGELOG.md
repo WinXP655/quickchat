@@ -1,6 +1,13 @@
 ## Public Releases
 
-**QuickChat (Current, 11 November 2026)**:
+**QuickChat (Current, 15 November 2026)**:
+- Added internals documentation.
+- Reduced buffer sizes. MinGW is counting in characters, not bytes, so buffers was oversized.
+- Replaced WSAAddressToStringW with inet_ntoa.
+- Replaced SecureZeroMemory with memset with no compiler optimization.
+- Added MessageBox fallback in LogMessage when no UI present at moment.
+
+**QuickChat (11 November 2026)**:
 - Fixed build script not setting subsystem version to 6.0 (Vista).
 - Removed commented out double check for is_running.
 
