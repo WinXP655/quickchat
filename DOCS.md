@@ -44,7 +44,7 @@ Owns all window handles (`hWndGlobal`, `hEdit`, etc.). It runs the standard Wind
 
 ### 2. The Receive Thread
 Created via `_beginthreadex`. It runs `ReceiveMessages()` and blocks on `recv()`.
-- **Timeout Dependency:** The socket uses `SO_RCVTIMEO` (5 seconds). This is a **survival mechanism**. Without it, `recv` would block forever, and `shutdown()` would not be able to wake it up, causing a deadlock on exit.
+- **Timeout Dependency:** The socket uses `SO_RCVTIMEO` (5 seconds). Without it, `recv` would block forever, and `shutdown()` would not be able to wake it up, causing a deadlock on exit.
 - **State Sync:** It checks `is_running` using `InterlockedCompareExchange`.
 
 ### 3. UI Proxy (Asynchronous Communication)
@@ -56,7 +56,7 @@ QuickChat uses a custom, TCP-based protocol with optional XOR obfuscation.
 - **Ports:** 65501 (XOR enabled) and 65502 (Plaintext).
 - **Handshake:** The client connects and sends `QC:<ComputerName>\0` (UTF-8). The server validates the `QC:` prefix and packet size, then replies with its own name in the same format.
 - **Packet Boundaries:** The protocol relies on the assumption that one `send()` equals one `recv()`. `TrimIncompleteUTF8()` is used to safely truncate incomplete multi-byte characters at the end of a TCP packet.
-- **XOR Key:** Stored in the stack during execution and wiped with `SecureZeroMemory`. It is split into multiple arrays to obfuscate its presence.
+- **XOR Key:** Stored in the stack during execution and wiped with `memset`. It is split into multiple arrays to obfuscate its presence.
 
 ## Shutdown and Cleanup Sequence
 The most sensitive part of the application is `CleanupAndExit()`. The exact order of operations prevents deadlocks and race conditions:
