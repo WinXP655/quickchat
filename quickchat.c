@@ -18,7 +18,7 @@
 
 // ======= 2. Defines =======
 // ----- Limits -----
-#define BUFFER_SIZE 8192
+#define BUFFER_SIZE 4096
 #define THREAD_WAIT_MS 5000
 
 // ----- Files -----
@@ -88,8 +88,8 @@ SOCKET client_socket = INVALID_SOCKET;
 HANDLE hReceiveThread = NULL;
 wchar_t local_ip[16] = L"";
 wchar_t remote_ip[16] = L"";
-wchar_t remote_name[256] = L"";
-wchar_t computer_name[256] = L"";
+wchar_t remote_name[64] = L"";
+wchar_t computer_name[64] = L"";
 
 // ----- Logging -----
 HANDLE chat_log = NULL;
@@ -230,7 +230,7 @@ LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
 		address = ExceptionInfo->ExceptionRecord->ExceptionAddress;
 	}
 
-	wchar_t crash_msg[512];
+	wchar_t crash_msg[128];
 	swprintf(crash_msg, sizeof(crash_msg) / sizeof(wchar_t),
 		L"A critical error has occurred.\n"
 		L"Error code: 0x%08lX\n"
@@ -244,10 +244,10 @@ LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
 	if (hCrashLog != INVALID_HANDLE_VALUE) {
 		time_t current = time(NULL);
 		struct tm* time_info = localtime(&current);
-		char timestamp[64];
+		char timestamp[32];
 		strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", time_info);
 
-		wchar_t wbuffer[512];
+		wchar_t wbuffer[128];
 		swprintf(wbuffer, sizeof(wbuffer) / sizeof(wchar_t),
 			L"--- Crash Report ---\r\n"
 			L"Time: %hs\r\n"
@@ -255,7 +255,7 @@ LONG WINAPI CrashHandler(EXCEPTION_POINTERS* ExceptionInfo) {
 			L"Address: %p\r\n",
 			timestamp, code, address);
 
-		char ansi_buffer[1024];
+		char ansi_buffer[256];
 		int len = WideCharToMultiByte(CP_UTF8, 0, wbuffer, -1, ansi_buffer, sizeof(ansi_buffer), NULL, NULL);
 
 		DWORD bytes_written;
@@ -277,7 +277,7 @@ BOOL InitializeLog(HANDLE hLogFile) {
 	wchar_t header[128];
 	wcsftime(header, sizeof(header) / sizeof(wchar_t), L"\r\n========== New session started at %H:%M:%S %d/%m/%Y ==========\r\n", t);
 
-	char utf8_buffer[1024];
+	char utf8_buffer[256];
 	int utf8_len = WideCharToMultiByte(CP_UTF8, 0, header, -1, utf8_buffer, sizeof(utf8_buffer), NULL, NULL);
 	if (utf8_len <= 0) return FALSE;
 
@@ -292,17 +292,17 @@ void LogMessage(const wchar_t* message) {
 	SYSTEMTIME st;
 	GetLocalTime(&st);
 
-	char timestamp[64];
+	char timestamp[32];
 	snprintf(timestamp, sizeof(timestamp),
 		"%04d-%02d-%02d %02d:%02d:%02d.%03d",
 		st.wYear, st.wMonth, st.wDay,
 		st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 
-	char msg_utf8[2048];
+	char msg_utf8[4096];
 	int utf8_len = WideCharToMultiByte(CP_UTF8, 0, message, -1, msg_utf8, sizeof(msg_utf8), NULL, NULL);
 	if (utf8_len <= 0) return;
 
-	char buffer[4096];
+	char buffer[8192];
 	int len = snprintf(buffer, sizeof(buffer), "[%s] %s\r\n", timestamp, msg_utf8);
 	if (len <= 0 || len >= (int)sizeof(buffer)) return;
 
@@ -310,9 +310,13 @@ void LogMessage(const wchar_t* message) {
 	if (!WriteFile(chat_log, buffer, len, &bytes_written, NULL)) {
 		DWORD err = GetLastError();
 
-		wchar_t err_msg[512];
+		wchar_t err_msg[128];
 		swprintf(err_msg, sizeof(err_msg) / sizeof(wchar_t), L"[ERROR]: Failed to write to log. Error: %lu. Logging will be disabled for this session.", err);
-		AddMessage(err_msg);
+		if (hWndGlobal) {
+			AddMessage(err_msg); 
+		} else {
+			MessageBoxW(NULL, err_msg, L"QuickChat", MB_OK | MB_ICONERROR);
+		}
 
 		logging_enabled = FALSE;
 		CloseHandle(chat_log);
@@ -331,7 +335,7 @@ void CloseLog(void) {
 	time_t now = time(NULL);
 	struct tm *t = localtime(&now);
 	
-	wchar_t timestamp[64];
+	wchar_t timestamp[32];
 	wcsftime(timestamp, sizeof(timestamp) / sizeof(wchar_t), L"%H:%M:%S %d/%m/%Y", t);
 
 	wchar_t wbuffer[128];
@@ -354,7 +358,7 @@ void LoadSettings(void) {
 	HANDLE hSettingsFile = CreateFileW(INI_FILE, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	if (hSettingsFile != INVALID_HANDLE_VALUE) {
-		char buffer[4096];
+		char buffer[512];
 		DWORD bytes_read;
 
 		if (ReadFile(hSettingsFile, buffer, sizeof(buffer) - 1, &bytes_read, NULL) && bytes_read > 0) {
@@ -486,7 +490,7 @@ void GetLocalComputerName(void) {
 }
 
 void ShowError(const wchar_t* msg, DWORD err) {
-	wchar_t buffer[512];
+	wchar_t buffer[256];
 	swprintf(buffer, sizeof(buffer) / sizeof(wchar_t), L"%ls. Error: %lu.", msg, err);
 	MessageBoxW(NULL, buffer, L"QuickChat", MB_OK | MB_ICONERROR);
 }
@@ -539,7 +543,8 @@ void XorObf(unsigned char *data, int len) {
 
 	for (int i = 0; i < len; i++) data[i] ^= k[i % KEY_LEN];
 
-	SecureZeroMemory(k, KEY_LEN);
+	memset(k, 0, KEY_LEN);
+	__asm__ __volatile__("" ::: "memory");
 }
 
 // ======= 10. UI Proxy =======
@@ -593,13 +598,13 @@ void CleanupAndExit(void) {
 }
 
 void SendLeaveMessage(void) {
-	wchar_t leave_msg[512];
+	wchar_t leave_msg[128];
 	swprintf(leave_msg, sizeof(leave_msg) / sizeof(wchar_t), L"[DISCONNECT]: %ls left the chat.", computer_name);
 	AddMessage(leave_msg);
 	if (is_server) LogMessage(leave_msg);
 
 	if (client_socket != INVALID_SOCKET && InterlockedCompareExchange(&is_running, 1, 1)) {
-		char encbuf[2048];
+		char encbuf[384];
 		int msg_len = WideCharToMultiByte(CP_UTF8, 0, leave_msg, -1, encbuf, sizeof(encbuf), NULL, NULL);
 
 		if (msg_len > 0) {
@@ -613,7 +618,7 @@ void SendCurrentMessage(void) {
 	int msglen = GetWindowTextLengthW(hEdit);
 	int maxallowed = (BUFFER_SIZE - 1) - (int)wcslen(computer_name) - 8;
 	if (msglen > maxallowed) {
-		wchar_t toolong_err[512] = L"[ERROR]: Message is too long to send.";
+		wchar_t toolong_err[128] = L"[ERROR]: Message is too long to send.";
 		AddMessage(toolong_err);
 		if (is_server) LogMessage(toolong_err);
 		return;
@@ -664,7 +669,7 @@ void SendCurrentMessage(void) {
 					default: error_desc = L"An unknown error has happened"; break;
 				}
 
-				wchar_t send_err[512];
+				wchar_t send_err[128];
 				swprintf(send_err, sizeof(send_err) / sizeof(wchar_t), L"[ERROR]: Failed to send message. Error: %ls (WSA error: %d).", error_desc, error_code);
 				AddMessage(send_err);
 				if (is_server) LogMessage(send_err);
@@ -731,7 +736,7 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 		LogMessage(L"[WARNING]: Could not detect LAN IP; using placeholder.");
 	}
 
-	wchar_t bind_msg[512];
+	wchar_t bind_msg[160];
 	const wchar_t* mode_str = xor_enabled ? L"QC with XOR" : L"QC";
 	swprintf(bind_msg, sizeof(bind_msg) / sizeof(wchar_t), L"Host started: %ls on address %ls port %d.", mode_str, local_ip, active_port);
 	LogMessage(bind_msg);
@@ -761,7 +766,7 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 		tv.tv_usec = NET_TIMEOUT_USEC;
 		setsockopt(temp_client, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
 
-		char hs[256];
+		char hs[160];
 		int recv_len = recv(temp_client, hs, sizeof(hs) - 1, 0);
 
 		if (recv_len <= 0) {
@@ -813,7 +818,7 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 
 	closesocket(server_fd);
 
-	char hs_reply[256];
+	char hs_reply[128];
 	strcpy(hs_reply, QC_LABEL);
 	int pos = strlen(QC_LABEL);
 	WideCharToMultiByte(CP_UTF8, 0, computer_name, -1, hs_reply + pos, sizeof(hs_reply) - pos, NULL, NULL);
@@ -829,7 +834,7 @@ BOOL StartServer(HINSTANCE hInstance, int nCmdShow) {
 
 	ShowMainWindow(hInstance, nCmdShow);
 
-	wchar_t join_msg[512];
+	wchar_t join_msg[128];
 	swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: %ls connected from %ls.", remote_name, remote_ip);
 	AddMessage(join_msg);
 	LogMessage(join_msg);
@@ -882,18 +887,15 @@ BOOL StartClient(HINSTANCE hInstance, int nCmdShow) {
 	if (getsockname(client_socket, (struct sockaddr*)&server_info, &len) != 0) {
 		wcscpy(local_ip, L"<Unknown>");
 	} else {
-		wchar_t ip_w[64];
-		DWORD ip_len = 64;
-		WSAAddressToStringW((LPSOCKADDR)&server_info, sizeof(server_info), NULL, ip_w, &ip_len);
-
-		wchar_t* colon = wcschr(ip_w, L':');
-		if (colon) *colon = L'\0';
-
-		wcsncpy(local_ip, ip_w, 15);
-		local_ip[15] = L'\0';
+		char* ip_str = inet_ntoa(server_info.sin_addr);
+		if (ip_str) {
+			MultiByteToWideChar(CP_UTF8, 0, ip_str, -1, local_ip, sizeof(local_ip) / sizeof(wchar_t));
+		} else {
+			wcscpy(local_ip, L"<Unknown>");
+		}
 	}
 
-	char hs[256];
+	char hs[160];
 	strcpy(hs, QC_LABEL);
 	int pos = strlen(QC_LABEL);
 	WideCharToMultiByte(CP_UTF8, 0, computer_name, -1, hs + pos, sizeof(hs) - pos, NULL, NULL);
@@ -901,7 +903,7 @@ BOOL StartClient(HINSTANCE hInstance, int nCmdShow) {
 	XorObf((unsigned char*)hs, hs_len);
 	send(client_socket, hs, hs_len, 0);
 
-	char hs_reply[256];
+	char hs_reply[160];
 	int recv_len = recv(client_socket, hs_reply, sizeof(hs_reply) - 1, 0);
 	if (recv_len <= 0) {
 		ShowError(L"Failed to receive peer handshake", WSAGetLastError());
@@ -924,7 +926,7 @@ BOOL StartClient(HINSTANCE hInstance, int nCmdShow) {
 
 	ShowMainWindow(hInstance, nCmdShow);
 
-	wchar_t join_msg[512];
+	wchar_t join_msg[128];
 	swprintf(join_msg, sizeof(join_msg) / sizeof(wchar_t), L"[CONNECT]: Connected to %ls at %ls.", remote_name, remote_ip);
 	AddMessage(join_msg);
 
@@ -941,7 +943,7 @@ unsigned int __stdcall ReceiveMessages(void*) {
 			int err_code = WSAGetLastError();
 			if (err_code == WSAETIMEDOUT) continue;
 
-			wchar_t connlost_err[512];
+			wchar_t connlost_err[128];
 			swprintf(connlost_err, sizeof(connlost_err) / sizeof(wchar_t), L"[ERROR]: Connection with remote computer lost. Error: %d.", err_code);
 			UIAddMessage(connlost_err);
 			if (is_server) LogMessage(connlost_err);
@@ -952,7 +954,7 @@ unsigned int __stdcall ReceiveMessages(void*) {
 		}
 
 		if (bytes == 0) {
-			wchar_t close_msg[512] = L"[DISCONNECT]: Remote computer has closed the connection.";
+			wchar_t close_msg[128] = L"[DISCONNECT]: Remote computer has closed the connection.";
 			UIAddMessage(close_msg);
 			if (is_server) LogMessage(close_msg);
 
@@ -1031,7 +1033,7 @@ void ShowMainWindow(HINSTANCE hInstance, int nCmdShow) {
 		return;
 	}
 
-	wchar_t title[512];
+	wchar_t title[128];
 	if (remote_name[0] != L'\0') {
 		swprintf(title, sizeof(title) / sizeof(wchar_t), L"QuickChat - %ls", remote_name);
 	} else {
@@ -1371,8 +1373,8 @@ void AddMessage(const wchar_t* msg) {
 		wcscat(truncated, L"... [truncated]");
 		to_display = truncated;
 
-		wchar_t log_msg[512];
-		swprintf(log_msg, sizeof(log_msg) / sizeof(wchar_t), L"[WARNING] Message is too long (%zu chars), truncated to %d.", wcslen(msg), BUFFER_SIZE - 1);
+		wchar_t log_msg[128];
+		swprintf(log_msg, sizeof(log_msg) / sizeof(wchar_t), L"[WARNING] Message is too long (%zu chars), truncated to %d chars.", wcslen(msg), BUFFER_SIZE - 1);
 		if (is_server) LogMessage(log_msg);
 	}
 
@@ -1578,7 +1580,7 @@ INT_PTR CALLBACK AboutDialogProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
 	
 	switch (msg) {
 		case WM_INITDIALOG: {
-			wchar_t version[64];
+			wchar_t version[32];
 			swprintf(version, sizeof(version) / sizeof(wchar_t), L"QuickChat (%hs)", __DATE__);
 			SetDlgItemTextW(hWnd, 301, version);
 			
@@ -1658,7 +1660,7 @@ void SaveChatToFile(HWND hWnd) {
 
 				DWORD bytes_written;
 				if (WriteFile(hFile, utf8, utf8_len - 1, &bytes_written, NULL)) {
-					wchar_t save_msg[512];
+					wchar_t save_msg[128];
 					swprintf(save_msg, sizeof(save_msg) / sizeof(wchar_t), L"[INFO]: Chat saved to %ls.", filename);
 					AddMessage(save_msg);
 				} else {
