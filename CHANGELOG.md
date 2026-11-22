@@ -1,6 +1,15 @@
 ## Public Releases
 
-**QuickChat (Current, 15 November 2026)**:
+**QuickChat (Current, 22 November 2026)**:
+- Added automatic saving and clearing chat history after 30000 symbols.
+- Fixed race condition in GetDefaultIP.
+- Changed SaveChatToFile timestamp from seconds to milliseconds precision to prevent overwriting old chats.
+
+Build script updates:
+- Removed dublicate resources compilation.
+- Removed redunant cleanup of runtime artifacts.
+
+**QuickChat (15 November 2026)**:
 - Added internals documentation.
 - Reduced buffer sizes. MinGW is counting in characters, not bytes, so buffers was oversized.
 - Replaced WSAAddressToStringW with inet_ntoa.
