@@ -528,7 +528,9 @@ BOOL GetDefaultIP(wchar_t *ip_buffer, size_t size) {
 	char ip_utf8[16];
 	strncpy(ip_utf8, inet_ntoa(local.sin_addr), 15);
 	ip_utf8[15] = '\0';
-	MultiByteToWideChar(CP_UTF8, 0, ip_utf8, -1, ip_buffer, size);
+
+	int wchars_to_write = (size > 16) ? 16 : (int)size;
+	MultiByteToWideChar(CP_UTF8, 0, ip_utf8, -1, ip_buffer, wchars_to_write);
 
 	closesocket(s);
 	return TRUE;
@@ -1364,6 +1366,23 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 void AddMessage(const wchar_t* msg) {
 	if (!hMsgDisplay || !msg || !*msg) return;
 
+	const int MAX_HISTORY_LEN = 30000;
+	int current_len = GetWindowTextLengthW(hMsgDisplay);
+	int msg_len = wcslen(msg);
+
+	if (current_len + msg_len + 2 > MAX_HISTORY_LEN) {
+		SaveChatToFile(hWndGlobal); 
+
+		SetWindowTextW(hMsgDisplay, L"");
+		current_len = 0;
+
+		const wchar_t* warn_msg = L"[WARNING]: Chat history limit reached. Previous messages saved to file and cleared.";
+		SendMessageW(hMsgDisplay, EM_SETSEL, 0, 0);
+		SendMessageW(hMsgDisplay, EM_REPLACESEL, FALSE, (LPARAM)warn_msg);
+
+		current_len = GetWindowTextLengthW(hMsgDisplay);
+	}
+
 	wchar_t truncated[BUFFER_SIZE];
 	const wchar_t* to_display = msg;
 
@@ -1636,9 +1655,14 @@ INT_PTR CALLBACK ComputerInfoProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 // ======= 14. Files  =======
 void SaveChatToFile(HWND hWnd) {
 	wchar_t filename[MAX_PATH];
-	time_t now = time(NULL);
-	struct tm *tm_info = localtime(&now);
-	wcsftime(filename, MAX_PATH, L"Chat-%Y%m%d-%H%M%S.txt", tm_info);
+
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+
+	swprintf(filename, MAX_PATH, L"Chat-%04d%02d%02d-%02d%02d%02d-%03d.txt", 
+				st.wYear, st.wMonth, st.wDay, 
+				st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
 
 	int len = GetWindowTextLengthW(hMsgDisplay);
 	wchar_t *chat_text = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));

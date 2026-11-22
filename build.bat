@@ -8,6 +8,7 @@ set MINBUILD=0
 set CLEAN=0
 set HELP=0
 set NOCLEANKEY=0
+set PREVBLD=0
 
 :parse_args
 if "%1"=="" goto :done_parse
@@ -71,8 +72,6 @@ if %CLEAN%==1 (
 	for %%F in (%RUNTIME_ARTIFACTS%) do (
 		if exist "%%F" del /f /q "%%F" >nul 2>&1
 	)
-
-	del /f /q Chat-*.txt >nul 2>&1
 
 	echo Cleaning key... ^(Skipped with /nocleankey^)
 	if %NOCLEANKEY%==0 if exist key.h del /f /q key.h >nul 2>&1
@@ -138,7 +137,6 @@ echo Building dialogs...
 %WINDRES% %WINDRES_TARGET% hostinfo.rc -o hostinfo.o || goto :build_failed
 %WINDRES% %WINDRES_TARGET% about.rc -o about.o || goto :build_failed
 %WINDRES% %WINDRES_TARGET% compinfo.rc -o compinfo.o || goto :build_failed
-%WINDRES% %WINDRES_TARGET% resources.rc -o resources.o || goto :build_failed
 echo [OK] Dialogs compiled
 
 echo Building resources...
