@@ -1,6 +1,6 @@
 # <img width="48" height="48" alt="icon-48x48x32" src="https://github.com/user-attachments/assets/9e3ee00a-aaf8-4c38-b40f-438c3bb999c9" /> QuickChat
 QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
-Does not require installation, leaves no traces, and works on any version starting from Windows Vista up to 11.
+Does not require installation and works on any version starting from Windows Vista up to 11.
 
 <img width="586" height="388" alt="image" src="https://github.com/user-attachments/assets/680decdf-96c4-4b41-a108-f02bb84a15b8" />
 
@@ -38,15 +38,15 @@ No major features are planned.
 
 ## Logging
 Logging is disabled by default. 
-- **Host:** Can save the full session history (messages, timestamps, connection IPs) to a local file.
-- **Client:** Can dump the current chat history to a file at any time.
+- **Host**: When enabled, session messages, timestamps are written to a local log file.
+- **Client**: User can manually save the current chat history.
 
 Nothing is sent to the cloud. Everything is stored locally.
 
 ## Use сases
 - **Quick 1-to-1 chat in a local network**: No server, no accounts, no setup.
-- **Private chat**: Optional XOR layer hides traffic from casual inspectors.
-- **Portable chat**: Single .exe file, no registry, no install, no traces.
+- **Private LAN chat**: Optional XOR layer hides traffic from casual inspectors.
+- **Portable chat**: Single .exe file, no registry, no install. Some local files still may be created.
 - **One-time sessions with no traces**: Logs off by default. Close the app and nothing remains.
 
 ## Changelog
