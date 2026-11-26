@@ -154,7 +154,7 @@ echo [OK] Build successful: quickchat.exe
 if %PACK%==1 (
 	echo Packing final package...
 
-	if exist QuickChat.zip del /f /q QuickChat.zip >nul 2>&1
+	if exist QuickChat.zip ren QuickChat.zip QuickChat_%random%.zip >nul 2>&1
 
 	7z a -tzip -y QuickChat.zip readme.txt join.wav leave.wav newmsg.wav quickchat.exe >nul
 	if errorlevel 1 goto :build_failed

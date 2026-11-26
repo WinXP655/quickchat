@@ -1,8 +1,7 @@
 # QuickChat - Minimalistic LAN Messenger
 
 QuickChat is a minimalistic LAN messenger, written in pure C with the Win32 API.
-Does not require installation, leaves no traces, and works on any version starting
-from Windows Vista up to 11.
+Does not require installation and works on any version starting from Windows Vista up to 11.
 
 Based on MicroChat Framework (https://github.com/WinXP655/microchat).
 
@@ -14,7 +13,7 @@ No major features are planned.
 1. Portable - just 1 .exe file
 2. Unicode Support - any languages, any symbols.
 3. QC (QuickChat) protocol with optional XOR.
-4. Logging - save chat history and events. Only for Server, disabled by default.
+4. Logging - save chat history and events. Only for host, disabled by default.
 5. Tiny Size - just 142 KB.
 6. Extracting text from text files by just drag-and-drop.
 
@@ -36,17 +35,20 @@ Client:
   4. Verify protocol settings (XOR must match the host's configuration).
 
 - Logging
-Full chat log stored only on host side and do not contain sensitive information.
-It only logs:
+Logging is disabled by default and can be enabled only host side.
+
+It logs:
   1. Session start and end.
   2. User messages with timestamps.
   3. System messages and events.
   4. Where server set port binding.
   5. Who connected (computer name and LAN IP).
 
-For client, added option to save just chat history:
+For client, there is an option to manually save chat history:
  - Connection
  - Save Chat
+
+Everything stored locally.
 
 - Changelog
 Read CHANGELOG.md in the official repository.
