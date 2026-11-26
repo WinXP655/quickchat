@@ -1,6 +1,10 @@
 ## Public Releases
 
-**QuickChat (Current, 22 November 2026)**:
+**QuickChat (Current, 26 November 2026)**:
+- Updated readme.
+- Replaced removing with renaming when building with /pack.
+
+**QuickChat (22 November 2026)**:
 - Added automatic saving and clearing chat history after 30000 symbols.
 - Fixed race condition in GetDefaultIP.
 - Changed SaveChatToFile timestamp from seconds to milliseconds precision to prevent overwriting old chats.
